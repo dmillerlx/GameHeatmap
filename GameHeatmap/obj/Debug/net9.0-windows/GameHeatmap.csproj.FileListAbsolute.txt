@@ -14,3 +14,4 @@ C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\refint\GameH
 C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.pdb
 C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.genruntimeconfig.cache
 C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\ref\GameHeatmap.dll
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.sourcelink.json

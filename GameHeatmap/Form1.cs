@@ -28,6 +28,13 @@ namespace GameHeatmap
         private ToolTip toolTip = null!;
         private CheckBox chkShowTooltips = null!;
         private bool showTooltips = true;
+        
+        // Database frequency tree
+        private MoveFrequencyTree? databaseTree = null;
+        private Button btnLoadDatabase = null!;
+        private Button btnViewDatabase = null!;
+        private Button btnSaveDatabase = null!;
+        private Button btnLoadCachedDatabase = null!;
 
         private Dictionary<TreeNode, HeatmapNode> nodeToHeatmap = new Dictionary<TreeNode, HeatmapNode>();
 
@@ -146,7 +153,53 @@ namespace GameHeatmap
             };
             btnLoadFiles.Click += BtnLoadFiles_Click;
             leftPanel.Controls.Add(btnLoadFiles);
-            yPos += 40;
+            yPos += 35;
+
+            // Database buttons
+            btnLoadDatabase = new Button
+            {
+                Text = "Load Database",
+                Location = new Point(10, yPos),
+                Size = new Size(145, 30),
+                BackColor = Color.LightYellow
+            };
+            btnLoadDatabase.Click += BtnLoadDatabase_Click;
+            leftPanel.Controls.Add(btnLoadDatabase);
+
+            btnViewDatabase = new Button
+            {
+                Text = "View Database",
+                Location = new Point(165, yPos),
+                Size = new Size(145, 30),
+                BackColor = Color.LightGreen,
+                Enabled = false
+            };
+            btnViewDatabase.Click += BtnViewDatabase_Click;
+            leftPanel.Controls.Add(btnViewDatabase);
+            yPos += 35;
+
+            // Save/Load cache buttons
+            btnSaveDatabase = new Button
+            {
+                Text = "Save Cache",
+                Location = new Point(10, yPos),
+                Size = new Size(145, 30),
+                BackColor = Color.LightCyan,
+                Enabled = false
+            };
+            btnSaveDatabase.Click += BtnSaveDatabase_Click;
+            leftPanel.Controls.Add(btnSaveDatabase);
+
+            btnLoadCachedDatabase = new Button
+            {
+                Text = "Load Cache",
+                Location = new Point(165, yPos),
+                Size = new Size(145, 30),
+                BackColor = Color.LightSalmon
+            };
+            btnLoadCachedDatabase.Click += BtnLoadCachedDatabase_Click;
+            leftPanel.Controls.Add(btnLoadCachedDatabase);
+            yPos += 35;
 
             // Games list
             Label lblGamesLabel = new Label
@@ -852,6 +905,286 @@ namespace GameHeatmap
         {
             SaveSettings();
             base.OnFormClosing(e);
+        }
+
+        private void BtnLoadDatabase_Click(object? sender, EventArgs e)
+        {
+            // Let user browse for the database file
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "PGN Files (*.pgn)|*.pgn|All Files (*.*)|*.*";
+                ofd.Title = "Select Database PGN File";
+                ofd.InitialDirectory = @"C:\data\chess\chessDatabase";
+                ofd.FileName = "caissabase_export_2024-07-21.pgn";
+
+                if (ofd.ShowDialog() != DialogResult.OK)
+                    return;
+
+                string selectedFile = ofd.FileName;
+
+                // Ask user for number of games to test with
+                using (var inputForm = new Form())
+                {
+                    inputForm.Text = "Load Database";
+                    inputForm.Size = new Size(450, 220);
+                    inputForm.StartPosition = FormStartPosition.CenterParent;
+                    inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    inputForm.MaximizeBox = false;
+                    inputForm.MinimizeBox = false;
+
+                    Label lblInfo = new Label
+                    {
+                        Text = $"File: {Path.GetFileName(selectedFile)}\n\nFor testing, enter number of games to load (0 = all):",
+                        Location = new Point(20, 20),
+                        Size = new Size(400, 60)
+                    };
+                    inputForm.Controls.Add(lblInfo);
+
+                    NumericUpDown numGames = new NumericUpDown
+                    {
+                        Location = new Point(20, 90),
+                        Size = new Size(150, 25),
+                        Minimum = 0,
+                        Maximum = 10000000,
+                        Value = 1000, // Default to 1000 games for testing
+                        Increment = 100
+                    };
+                    inputForm.Controls.Add(numGames);
+
+                    Button btnOK = new Button
+                    {
+                        Text = "Load",
+                        DialogResult = DialogResult.OK,
+                        Location = new Point(250, 85),
+                        Size = new Size(75, 30)
+                    };
+                    inputForm.Controls.Add(btnOK);
+
+                    Button btnCancel = new Button
+                    {
+                        Text = "Cancel",
+                        DialogResult = DialogResult.Cancel,
+                        Location = new Point(335, 85),
+                        Size = new Size(75, 30)
+                    };
+                    inputForm.Controls.Add(btnCancel);
+
+                    inputForm.AcceptButton = btnOK;
+                    inputForm.CancelButton = btnCancel;
+
+                    if (inputForm.ShowDialog() != DialogResult.OK)
+                        return;
+
+                    int maxGames = (int)numGames.Value;
+                    LoadDatabaseFile(selectedFile, maxGames);
+                }
+            }
+        }
+
+        private void LoadDatabaseFile(string filePath, int maxGames)
+        {
+            if (!File.Exists(filePath))
+            {
+                MessageBox.Show($"File not found: {filePath}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Show file info
+            FileInfo fileInfo = new FileInfo(filePath);
+            var result = MessageBox.Show(
+                $"File: {fileInfo.Name}\n" +
+                $"Size: {fileInfo.Length / (1024.0 * 1024.0):F1} MB\n" +
+                $"Games to load: {(maxGames == 0 ? "ALL" : maxGames.ToString())}\n\n" +
+                $"Continue?",
+                "Confirm Load",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result != DialogResult.Yes)
+                return;
+
+            // Create progress form
+            using (var progressForm = new Form())
+            {
+                progressForm.Text = "Loading Database";
+                progressForm.Size = new Size(400, 150);
+                progressForm.StartPosition = FormStartPosition.CenterParent;
+                progressForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                progressForm.MaximizeBox = false;
+                progressForm.MinimizeBox = false;
+                progressForm.ControlBox = false;
+
+                Label lblProgress = new Label
+                {
+                    Text = "Processing games...",
+                    Location = new Point(20, 20),
+                    Size = new Size(350, 20),
+                    Font = new Font("Segoe UI", 10)
+                };
+                progressForm.Controls.Add(lblProgress);
+
+                Label lblTime = new Label
+                {
+                    Text = "Elapsed: 0s",
+                    Location = new Point(20, 45),
+                    Size = new Size(350, 20),
+                    Font = new Font("Segoe UI", 9),
+                    ForeColor = Color.DarkGray
+                };
+                progressForm.Controls.Add(lblTime);
+
+                ProgressBar progressBar = new ProgressBar
+                {
+                    Location = new Point(20, 60),
+                    Size = new Size(350, 25),
+                    Style = ProgressBarStyle.Continuous
+                };
+                progressForm.Controls.Add(progressBar);
+
+                // Show form and start processing on background thread
+                progressForm.Show();
+                Application.DoEvents();
+
+                try
+                {
+                    int maxDepth = (int)numDepth.Value;
+                    databaseTree = new MoveFrequencyTree(maxDepth);
+
+                    var startTime = DateTime.Now;
+                    var progress = new Progress<(int gamesProcessed, int totalGames)>(update =>
+                    {
+                        var elapsed = DateTime.Now - startTime;
+                        lblProgress.Text = $"Processed: {update.gamesProcessed:N0} games";
+                        lblTime.Text = $"Elapsed: {elapsed.TotalSeconds:F1}s  |  Rate: {(update.gamesProcessed / elapsed.TotalSeconds):F0} games/sec";
+                        
+                        if (maxGames > 0)
+                        {
+                            int percentage = (int)((update.gamesProcessed * 100.0) / maxGames);
+                            progressBar.Value = Math.Min(100, percentage);
+                        }
+                        else
+                        {
+                            // Indeterminate progress - just show count
+                            progressBar.Style = ProgressBarStyle.Marquee;
+                        }
+                    });
+
+                    // Process on background thread
+                    var task = System.Threading.Tasks.Task.Run(() =>
+                    {
+                        databaseTree.ProcessPGNFile(filePath, maxGames, progress);
+                    });
+
+                    // Wait for completion while keeping UI responsive
+                    while (!task.IsCompleted)
+                    {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(100);
+                    }
+
+                    progressForm.Close();
+
+                    MessageBox.Show($"Successfully loaded {databaseTree.TotalGamesProcessed:N0} games!\n\n" +
+                                  $"Click 'View Database' to see the move frequency tree.\n" +
+                                  $"Click 'Save Cache' to save for instant loading next time.",
+                                  "Database Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    btnViewDatabase.Enabled = true;
+                    btnSaveDatabase.Enabled = true;
+                }
+                catch (Exception ex)
+                {
+                    progressForm.Close();
+                    MessageBox.Show($"Error loading database: {ex.Message}", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void BtnViewDatabase_Click(object? sender, EventArgs e)
+        {
+            if (databaseTree == null || databaseTree.TotalGamesProcessed == 0)
+            {
+                MessageBox.Show("No database loaded. Click 'Load Database' first.", "No Data",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var dbForm = new DatabaseTreeForm(databaseTree);
+            dbForm.ShowDialog(this);
+        }
+
+        private void BtnSaveDatabase_Click(object? sender, EventArgs e)
+        {
+            if (databaseTree == null || databaseTree.TotalGamesProcessed == 0)
+            {
+                MessageBox.Show("No database loaded to save.", "No Data",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "Database Cache (*.dbcache)|*.dbcache|All Files (*.*)|*.*";
+                sfd.Title = "Save Database Cache";
+                sfd.FileName = $"chess_database_{databaseTree.TotalGamesProcessed}games.dbcache";
+
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        databaseTree.SaveToFile(sfd.FileName);
+                        MessageBox.Show($"Database cache saved successfully!\n\n" +
+                                      $"File: {Path.GetFileName(sfd.FileName)}\n" +
+                                      $"Games: {databaseTree.TotalGamesProcessed:N0}\n\n" +
+                                      $"Use 'Load Cache' to load instantly next time.",
+                                      "Cache Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error saving cache: {ex.Message}", "Error",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void BtnLoadCachedDatabase_Click(object? sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "Database Cache (*.dbcache)|*.dbcache|All Files (*.*)|*.*";
+                ofd.Title = "Load Database Cache";
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        var loadedTree = MoveFrequencyTree.LoadFromFile(ofd.FileName);
+                        if (loadedTree != null)
+                        {
+                            databaseTree = loadedTree;
+                            MessageBox.Show($"Database cache loaded successfully!\n\n" +
+                                          $"Games: {databaseTree.TotalGamesProcessed:N0}\n\n" +
+                                          $"Click 'View Database' to see the tree.",
+                                          "Cache Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            btnViewDatabase.Enabled = true;
+                            btnSaveDatabase.Enabled = true;
+                        }
+                        else
+                        {
+                            MessageBox.Show("Failed to load cache file.", "Error",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error loading cache: {ex.Message}", "Error",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
         }
     }
 }
