@@ -926,7 +926,7 @@ namespace GameHeatmap
                 using (var inputForm = new Form())
                 {
                     inputForm.Text = "Load Database";
-                    inputForm.Size = new Size(450, 220);
+                    inputForm.Size = new Size(450, 200);
                     inputForm.StartPosition = FormStartPosition.CenterParent;
                     inputForm.FormBorderStyle = FormBorderStyle.FixedDialog;
                     inputForm.MaximizeBox = false;
@@ -946,16 +946,34 @@ namespace GameHeatmap
                         Size = new Size(150, 25),
                         Minimum = 0,
                         Maximum = 10000000,
-                        Value = 1000, // Default to 1000 games for testing
-                        Increment = 100
+                        Value = 10000, // Default to 10000 games
+                        Increment = 1000
                     };
                     inputForm.Controls.Add(numGames);
+
+                    Label lblThreads = new Label
+                    {
+                        Text = "Threads:",
+                        Location = new Point(190, 92),
+                        Size = new Size(60, 20)
+                    };
+                    inputForm.Controls.Add(lblThreads);
+
+                    NumericUpDown numThreads = new NumericUpDown
+                    {
+                        Location = new Point(250, 90),
+                        Size = new Size(60, 25),
+                        Minimum = 1,
+                        Maximum = 16,
+                        Value = 4 // Default to 4 threads (sweet spot for I/O)
+                    };
+                    inputForm.Controls.Add(numThreads);
 
                     Button btnOK = new Button
                     {
                         Text = "Load",
                         DialogResult = DialogResult.OK,
-                        Location = new Point(250, 85),
+                        Location = new Point(250, 125),
                         Size = new Size(75, 30)
                     };
                     inputForm.Controls.Add(btnOK);
@@ -964,7 +982,7 @@ namespace GameHeatmap
                     {
                         Text = "Cancel",
                         DialogResult = DialogResult.Cancel,
-                        Location = new Point(335, 85),
+                        Location = new Point(335, 125),
                         Size = new Size(75, 30)
                     };
                     inputForm.Controls.Add(btnCancel);
@@ -976,12 +994,13 @@ namespace GameHeatmap
                         return;
 
                     int maxGames = (int)numGames.Value;
-                    LoadDatabaseFile(selectedFile, maxGames);
+                    int threads = (int)numThreads.Value;
+                    LoadDatabaseFile(selectedFile, maxGames, threads);
                 }
             }
         }
 
-        private void LoadDatabaseFile(string filePath, int maxGames)
+        private void LoadDatabaseFile(string filePath, int maxGames, int numThreads)
         {
             if (!File.Exists(filePath))
             {
@@ -995,7 +1014,8 @@ namespace GameHeatmap
             var result = MessageBox.Show(
                 $"File: {fileInfo.Name}\n" +
                 $"Size: {fileInfo.Length / (1024.0 * 1024.0):F1} MB\n" +
-                $"Games to load: {(maxGames == 0 ? "ALL" : maxGames.ToString())}\n\n" +
+                $"Games to load: {(maxGames == 0 ? "ALL" : maxGames.ToString())}\n" +
+                $"Threads: {numThreads}\n\n" +
                 $"Continue?",
                 "Confirm Load",
                 MessageBoxButtons.YesNo,
@@ -1052,11 +1072,26 @@ namespace GameHeatmap
                     databaseTree = new MoveFrequencyTree(maxDepth);
 
                     var startTime = DateTime.Now;
+                    bool isMerging = false;
+                    int lastProcessed = 0;
                     var progress = new Progress<(int gamesProcessed, int totalGames)>(update =>
                     {
                         var elapsed = DateTime.Now - startTime;
-                        lblProgress.Text = $"Processed: {update.gamesProcessed:N0} games";
-                        lblTime.Text = $"Elapsed: {elapsed.TotalSeconds:F1}s  |  Rate: {(update.gamesProcessed / elapsed.TotalSeconds):F0} games/sec";
+                        
+                        // Detect if we're in merge phase (game count stopped increasing)
+                        if (update.gamesProcessed == lastProcessed && !isMerging && update.gamesProcessed > 0)
+                        {
+                            isMerging = true;
+                            lblProgress.Text = $"Merging {numThreads} trees... ({update.gamesProcessed:N0} games)";
+                            lblTime.Text = $"Elapsed: {elapsed.TotalSeconds:F1}s";
+                            return;
+                        }
+                        
+                        lastProcessed = update.gamesProcessed;
+                        lblProgress.Text = isMerging ? 
+                            $"Merged: {update.gamesProcessed:N0} games" : 
+                            $"Processed: {update.gamesProcessed:N0} games";
+                        lblTime.Text = $"Elapsed: {elapsed.TotalSeconds:F1}s  |  Rate: {(update.gamesProcessed / Math.Max(1, elapsed.TotalSeconds)):F0} games/sec";
                         
                         if (maxGames > 0)
                         {
@@ -1073,7 +1108,7 @@ namespace GameHeatmap
                     // Process on background thread
                     var task = System.Threading.Tasks.Task.Run(() =>
                     {
-                        databaseTree.ProcessPGNFile(filePath, maxGames, progress);
+                        databaseTree.ProcessPGNFileParallel(filePath, maxGames, progress, numThreads);
                     });
 
                     // Wait for completion while keeping UI responsive
