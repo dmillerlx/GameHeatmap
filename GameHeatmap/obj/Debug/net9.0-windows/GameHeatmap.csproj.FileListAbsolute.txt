@@ -1,0 +1,16 @@
+C:\data\chess\apps\GameHeatmap\GameHeatmap\bin\Debug\net9.0-windows\GameHeatmap.exe
+C:\data\chess\apps\GameHeatmap\GameHeatmap\bin\Debug\net9.0-windows\GameHeatmap.deps.json
+C:\data\chess\apps\GameHeatmap\GameHeatmap\bin\Debug\net9.0-windows\GameHeatmap.runtimeconfig.json
+C:\data\chess\apps\GameHeatmap\GameHeatmap\bin\Debug\net9.0-windows\GameHeatmap.dll
+C:\data\chess\apps\GameHeatmap\GameHeatmap\bin\Debug\net9.0-windows\GameHeatmap.pdb
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.Form1.resources
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.csproj.GenerateResource.cache
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.GeneratedMSBuildEditorConfig.editorconfig
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.AssemblyInfoInputs.cache
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.AssemblyInfo.cs
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.csproj.CoreCompileInputs.cache
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.dll
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\refint\GameHeatmap.dll
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.pdb
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.genruntimeconfig.cache
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\ref\GameHeatmap.dll

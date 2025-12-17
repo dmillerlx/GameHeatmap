@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\data\\chess\\apps\\GameHeatmap\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Form1.cs [Design]",
+              "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs",
+              "RelativeDocumentMoniker": "GameHeatmap\\Form1.cs",
+              "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs [Design]",
+              "RelativeToolTip": "GameHeatmap\\Form1.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-10T04:42:27.077Z",
+              "EditorCaption": " [Design]"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

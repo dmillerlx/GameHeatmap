@@ -1,0 +1,857 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using System.IO;
+
+namespace GameHeatmap
+{
+    public partial class Form1 : Form
+    {
+        private List<PgnGame> allGames = new List<PgnGame>();
+        private List<PgnGame> filteredGames = new List<PgnGame>();
+        private HeatmapBuilder? heatmapBuilder;
+
+        // UI Controls
+        private TreeView treeView = null!;
+        private ListBox lstGames = null!;
+        private TextBox txtPlayerFilter = null!;
+        private Button btnLoadFiles = null!;
+        private Button btnApplyFilter = null!;
+        private RadioButton rbWhite = null!;
+        private RadioButton rbBlack = null!;
+        private Label lblStatus = null!;
+        private NumericUpDown numDepth = null!;
+        private Label lblDepth = null!;
+        private Label lblStats = null!;
+        private ToolTip toolTip = null!;
+        private CheckBox chkShowTooltips = null!;
+        private bool showTooltips = true;
+
+        private Dictionary<TreeNode, HeatmapNode> nodeToHeatmap = new Dictionary<TreeNode, HeatmapNode>();
+
+        public Form1()
+        {
+            InitializeComponent();
+            InitializeCustomComponents();
+            LoadSettings();
+        }
+
+        private void InitializeCustomComponents()
+        {
+            this.Text = "Chess Game Heatmap - Theodore's Games";
+            this.Size = new Size(1200, 800);
+            this.AllowDrop = true;
+
+            toolTip = new ToolTip();
+            toolTip.AutoPopDelay = 5000;
+            toolTip.InitialDelay = 500;
+
+            // Left panel for controls
+            Panel leftPanel = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 320,
+                Padding = new Padding(10)
+            };
+
+            int yPos = 10;
+
+            // Player filter
+            Label lblPlayerFilterLabel = new Label
+            {
+                Text = "Player Filter (comma-separated):",
+                Location = new Point(10, yPos),
+                Size = new Size(300, 20)
+            };
+            leftPanel.Controls.Add(lblPlayerFilterLabel);
+            yPos += 25;
+
+            txtPlayerFilter = new TextBox
+            {
+                Location = new Point(10, yPos),
+                Size = new Size(300, 25),
+                PlaceholderText = "Theodore, !bot (use ! to exclude)"
+            };
+            leftPanel.Controls.Add(txtPlayerFilter);
+            yPos += 35;
+
+            // Color selection
+            Label lblColorLabel = new Label
+            {
+                Text = "Theodore plays as:",
+                Location = new Point(10, yPos),
+                Size = new Size(300, 20)
+            };
+            leftPanel.Controls.Add(lblColorLabel);
+            yPos += 25;
+
+            rbWhite = new RadioButton
+            {
+                Text = "White",
+                Location = new Point(10, yPos),
+                Size = new Size(100, 25),
+                Checked = true
+            };
+            leftPanel.Controls.Add(rbWhite);
+
+            rbBlack = new RadioButton
+            {
+                Text = "Black",
+                Location = new Point(120, yPos),
+                Size = new Size(100, 25)
+            };
+            leftPanel.Controls.Add(rbBlack);
+            yPos += 35;
+
+            // Depth filter
+            lblDepth = new Label
+            {
+                Text = "Max Depth (moves):",
+                Location = new Point(10, yPos),
+                Size = new Size(150, 20)
+            };
+            leftPanel.Controls.Add(lblDepth);
+
+            numDepth = new NumericUpDown
+            {
+                Location = new Point(170, yPos - 2),
+                Size = new Size(140, 25),
+                Minimum = 1,
+                Maximum = 200,
+                Value = 50
+            };
+            leftPanel.Controls.Add(numDepth);
+            yPos += 35;
+
+            // Apply filter button
+            btnApplyFilter = new Button
+            {
+                Text = "Apply Filter",
+                Location = new Point(10, yPos),
+                Size = new Size(300, 35),
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+            btnApplyFilter.Click += BtnApplyFilter_Click;
+            leftPanel.Controls.Add(btnApplyFilter);
+            yPos += 45;
+
+            // Load files button
+            btnLoadFiles = new Button
+            {
+                Text = "Load PGN Files",
+                Location = new Point(10, yPos),
+                Size = new Size(300, 30)
+            };
+            btnLoadFiles.Click += BtnLoadFiles_Click;
+            leftPanel.Controls.Add(btnLoadFiles);
+            yPos += 40;
+
+            // Games list
+            Label lblGamesLabel = new Label
+            {
+                Text = "Loaded Games (multi-select):",
+                Location = new Point(10, yPos),
+                Size = new Size(300, 20)
+            };
+            leftPanel.Controls.Add(lblGamesLabel);
+            yPos += 25;
+
+            lstGames = new ListBox
+            {
+                Location = new Point(10, yPos),
+                Size = new Size(300, 400),
+                SelectionMode = SelectionMode.MultiExtended,
+                Font = new Font("Consolas", 8),
+                IntegralHeight = false
+            };
+            lstGames.SelectedIndexChanged += LstGames_SelectedIndexChanged;
+            lstGames.KeyDown += LstGames_KeyDown;
+            leftPanel.Controls.Add(lstGames);
+            yPos += 410;
+
+            // Status label
+            lblStatus = new Label
+            {
+                Location = new Point(10, yPos),
+                Size = new Size(300, 60),
+                Text = "No games loaded"
+            };
+            leftPanel.Controls.Add(lblStatus);
+
+            // Right panel for tree (ADD FIRST - Fill takes remaining space)
+            Panel rightPanel = new Panel
+            {
+                Dock = DockStyle.Fill
+            };
+
+            // TreeView - ADD FIRST so it fills remaining space
+            treeView = new TreeView
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Consolas", 10),
+                HideSelection = false,
+                ShowLines = true,
+                ShowPlusMinus = true,
+                ShowRootLines = true,
+                Scrollable = true
+            };
+            treeView.NodeMouseClick += TreeView_NodeMouseClick;
+            treeView.NodeMouseDoubleClick += TreeView_NodeMouseDoubleClick;
+            rightPanel.Controls.Add(treeView);
+
+            // Top control panel for tree - ADD SECOND so it docks at top
+            Panel treeControlPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 80,
+                Padding = new Padding(5)
+            };
+
+            // Stats label
+            lblStats = new Label
+            {
+                Text = "Tree View",
+                Location = new Point(5, 5),
+                Size = new Size(800, 25),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            treeControlPanel.Controls.Add(lblStats);
+
+            // Legend label
+            Label lblLegend = new Label
+            {
+                Text = "Colors: Bold Red (80%+) | Dark Red (50-79%) | Orange (20-49%) | Gray (<20%)  |  Format: Move (games/total = %)",
+                Location = new Point(5, 33),
+                Size = new Size(800, 20),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.DarkSlateGray,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            treeControlPanel.Controls.Add(lblLegend);
+
+            // Expand/Collapse buttons
+            Button btnExpandAll = new Button
+            {
+                Text = "Expand All",
+                Location = new Point(5, 55),
+                Size = new Size(100, 25)
+            };
+            btnExpandAll.Click += (s, e) => treeView.ExpandAll();
+            treeControlPanel.Controls.Add(btnExpandAll);
+
+            Button btnCollapseAll = new Button
+            {
+                Text = "Collapse All",
+                Location = new Point(115, 55),
+                Size = new Size(100, 25)
+            };
+            btnCollapseAll.Click += (s, e) => treeView.CollapseAll();
+            treeControlPanel.Controls.Add(btnCollapseAll);
+
+            // Show tooltips checkbox
+            chkShowTooltips = new CheckBox
+            {
+                Text = "Show Tooltips",
+                Location = new Point(225, 57),
+                Size = new Size(120, 25),
+                Checked = true
+            };
+            chkShowTooltips.CheckedChanged += (s, e) => { showTooltips = chkShowTooltips.Checked; };
+            treeControlPanel.Controls.Add(chkShowTooltips);
+
+            rightPanel.Controls.Add(treeControlPanel);
+
+            // Add in reverse Z-order: Fill first, then splitter, then Left
+            this.Controls.Add(rightPanel);
+
+            // Add a splitter for resizing
+            Splitter splitter = new Splitter
+            {
+                Dock = DockStyle.Left,
+                Width = 5,
+                BackColor = Color.DarkGray
+            };
+            this.Controls.Add(splitter);
+
+            // Add left panel last
+            this.Controls.Add(leftPanel);
+
+            // Drag and drop handlers
+            this.DragEnter += Form1_DragEnter;
+            this.DragDrop += Form1_DragDrop;
+        }
+
+        private void LoadSettings()
+        {
+            // Load player filter
+            string savedFilter = RegistryUtils.GetString("PlayerFilter", "Theodore");
+            txtPlayerFilter.Text = savedFilter;
+
+            // Load depth filter
+            int savedDepth = RegistryUtils.GetInt("MaxDepth", 50);
+            numDepth.Value = savedDepth;
+
+            // Load color selection
+            bool playingWhite = RegistryUtils.GetBool("PlayingWhite", true);
+            rbWhite.Checked = playingWhite;
+            rbBlack.Checked = !playingWhite;
+
+            // Load tooltip preference
+            bool showTooltipsPref = RegistryUtils.GetBool("ShowTooltips", true);
+            chkShowTooltips.Checked = showTooltipsPref;
+            showTooltips = showTooltipsPref;
+
+            // Load saved files and auto-apply filter
+            var savedFiles = RegistryUtils.GetFileList();
+            if (savedFiles.Count > 0)
+            {
+                LoadPGNFiles(savedFiles);
+            }
+        }
+
+        private void SaveSettings()
+        {
+            RegistryUtils.SetString("PlayerFilter", txtPlayerFilter.Text);
+            RegistryUtils.SetInt("MaxDepth", (int)numDepth.Value);
+            RegistryUtils.SetBool("PlayingWhite", rbWhite.Checked);
+            RegistryUtils.SetBool("ShowTooltips", chkShowTooltips.Checked);
+        }
+
+        private void BtnLoadFiles_Click(object? sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "PGN Files (*.pgn)|*.pgn|All Files (*.*)|*.*";
+                ofd.Multiselect = true;
+                ofd.Title = "Select PGN Files";
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    LoadPGNFiles(ofd.FileNames.ToList());
+                    RegistryUtils.SetFileList(ofd.FileNames.ToList());
+                }
+            }
+        }
+
+        private void LoadPGNFiles(List<string> filePaths)
+        {
+            allGames.Clear();
+            lstGames.Items.Clear();
+
+            PgnParser parser = new PgnParser();
+
+            foreach (string filePath in filePaths)
+            {
+                try
+                {
+                    string pgnText = File.ReadAllText(filePath);
+                    var games = parser.ParseGames(pgnText);
+                    allGames.AddRange(games);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error loading {Path.GetFileName(filePath)}: {ex.Message}",
+                        "Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+
+            lblStatus.Text = $"Loaded {allGames.Count} games from {filePaths.Count} file(s)";
+            
+            // Auto-apply filter if we have games and a filter is set
+            if (allGames.Count > 0 && !string.IsNullOrWhiteSpace(txtPlayerFilter.Text))
+            {
+                ApplyFilter();
+            }
+        }
+
+        private void BtnApplyFilter_Click(object? sender, EventArgs e)
+        {
+            SaveSettings();
+            ApplyFilter();
+        }
+
+        private void ApplyFilter()
+        {
+            if (allGames.Count == 0)
+            {
+                lblStatus.Text = "No games loaded";
+                treeView.Nodes.Clear();
+                return;
+            }
+
+            string filterText = txtPlayerFilter.Text.Trim();
+            bool filterForWhite = rbWhite.Checked;
+
+            if (string.IsNullOrEmpty(filterText))
+            {
+                MessageBox.Show("Please enter a player name to filter.", "No Filter",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Split by comma and process each keyword
+            var includeKeywords = new List<string>();
+            var excludeKeywords = new List<string>();
+            
+            foreach (var keyword in filterText.Split(','))
+            {
+                var trimmed = keyword.Trim().ToLowerInvariant();
+                if (string.IsNullOrEmpty(trimmed))
+                    continue;
+                    
+                if (trimmed.StartsWith("!"))
+                {
+                    // Exclude keyword (remove the ! prefix)
+                    var exclude = trimmed.Substring(1).Trim();
+                    if (!string.IsNullOrEmpty(exclude))
+                        excludeKeywords.Add(exclude);
+                }
+                else
+                {
+                    // Include keyword
+                    includeKeywords.Add(trimmed);
+                }
+            }
+
+            // Must have at least one include keyword
+            if (includeKeywords.Count == 0)
+            {
+                MessageBox.Show("Please enter at least one player name to include (without !).", "No Include Filter",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Filter games where the player is playing the selected color
+            filteredGames = allGames.Where(game =>
+            {
+                string white = game.Tags.TryGetValue("White", out var w) ? w.ToLowerInvariant() : "";
+                string black = game.Tags.TryGetValue("Black", out var b) ? b.ToLowerInvariant() : "";
+
+                bool matchesWhite = includeKeywords.Any(keyword => white.Contains(keyword));
+                bool matchesBlack = includeKeywords.Any(keyword => black.Contains(keyword));
+                
+                // Check exclusions
+                bool excludedWhite = excludeKeywords.Any(keyword => white.Contains(keyword));
+                bool excludedBlack = excludeKeywords.Any(keyword => black.Contains(keyword));
+
+                // Return true if the player is in the correct color and not excluded
+                if (filterForWhite)
+                    return matchesWhite && !excludedWhite;
+                else
+                    return matchesBlack && !excludedBlack;
+            }).ToList();
+
+            // Update games list
+            lstGames.Items.Clear();
+            foreach (var game in filteredGames)
+            {
+                string white = game.Tags.TryGetValue("White", out var w) ? w : "?";
+                string black = game.Tags.TryGetValue("Black", out var b) ? b : "?";
+                string result = game.Tags.TryGetValue("Result", out var r) ? r : "*";
+                string eventName = game.Tags.TryGetValue("Event", out var ev) ? ev : "?";
+
+                // Create display string
+                string displayText = $"{white} vs {black} [{result}] - {eventName}";
+                lstGames.Items.Add(displayText);
+            }
+
+            // Select all items by default
+            for (int i = 0; i < lstGames.Items.Count; i++)
+            {
+                lstGames.SetSelected(i, true);
+            }
+
+            lblStatus.Text = $"Filtered: {filteredGames.Count} of {allGames.Count} games\n" +
+                           $"(Theodore as {(filterForWhite ? "White" : "Black")})\n" +
+                           $"Selected: {lstGames.SelectedItems.Count}";
+
+            // Build heatmap tree with all selected games
+            BuildHeatmapTreeFromSelection();
+        }
+
+        private void LstGames_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            // Rebuild tree when selection changes
+            if (lstGames.SelectedItems.Count > 0)
+            {
+                BuildHeatmapTreeFromSelection();
+                bool filterForWhite = rbWhite.Checked;
+                lblStatus.Text = $"Filtered: {filteredGames.Count} of {allGames.Count} games\n" +
+                               $"(Theodore as {(filterForWhite ? "White" : "Black")})\n" +
+                               $"Selected: {lstGames.SelectedItems.Count}";
+            }
+            else
+            {
+                treeView.Nodes.Clear();
+                lblStats.Text = "No games selected";
+            }
+        }
+
+        private void LstGames_KeyDown(object? sender, KeyEventArgs e)
+        {
+            // Handle Ctrl+A to select all
+            if (e.Control && e.KeyCode == Keys.A)
+            {
+                for (int i = 0; i < lstGames.Items.Count; i++)
+                {
+                    lstGames.SetSelected(i, true);
+                }
+                e.Handled = true;
+            }
+        }
+
+        private void BuildHeatmapTreeFromSelection()
+        {
+            // Get selected games based on ListBox indices
+            var selectedGames = new List<PgnGame>();
+            foreach (int index in lstGames.SelectedIndices)
+            {
+                if (index < filteredGames.Count)
+                {
+                    selectedGames.Add(filteredGames[index]);
+                }
+            }
+
+            if (selectedGames.Count == 0)
+            {
+                treeView.Nodes.Clear();
+                lblStats.Text = "No games selected";
+                return;
+            }
+
+            // Build heatmap with selected games only
+            int maxDepth = (int)numDepth.Value;
+            heatmapBuilder = new HeatmapBuilder(maxDepth);
+
+            foreach (var game in selectedGames)
+            {
+                heatmapBuilder.AddGame(game);
+            }
+
+            BuildTreeView();
+        }
+
+        private void BuildTreeView()
+        {
+            treeView.Nodes.Clear();
+            nodeToHeatmap.Clear();
+
+            if (heatmapBuilder == null)
+            {
+                treeView.Nodes.Add("No games to display");
+                lblStats.Text = "No games loaded";
+                return;
+            }
+
+            // Check if root has children
+            if (heatmapBuilder.Root.Children.Count == 0)
+            {
+                treeView.Nodes.Add($"No moves found (checked {heatmapBuilder.Root.Frequency} games)");
+                lblStats.Text = $"Error: Games loaded but no moves found";
+                return;
+            }
+
+            var root = new TreeNode($"Opening ({heatmapBuilder.Root.Frequency} games)");
+            root.Tag = heatmapBuilder.Root;
+            nodeToHeatmap[root] = heatmapBuilder.Root;
+
+            BuildTreeRecursive(root, heatmapBuilder.Root);
+
+            treeView.Nodes.Add(root);
+            root.Expand();
+
+            // Update stats
+            int maxFreq = heatmapBuilder.GetMaxFrequency();
+            lblStats.Text = $"Selected Games: {heatmapBuilder.Root.Frequency} | " +
+                          $"Unique Moves: {heatmapBuilder.Root.Children.Count} | " +
+                          $"Most Frequent: {maxFreq} | " +
+                          $"Theodore as {(rbWhite.Checked ? "White" : "Black")}";
+        }
+
+        private void ColorCodeNodeByFrequency(TreeNode treeNode, HeatmapNode heatmapNode, HeatmapNode parent)
+        {
+            int maxFreqAtLevel = parent.Children.Max(c => c.Frequency);
+            float intensity = maxFreqAtLevel > 0 ? (float)heatmapNode.Frequency / maxFreqAtLevel : 0f;
+
+            if (intensity >= 0.8f)
+            {
+                treeNode.ForeColor = Color.Red;
+                treeNode.NodeFont = new Font(treeView.Font, FontStyle.Bold);
+            }
+            else if (intensity >= 0.5f)
+            {
+                treeNode.ForeColor = Color.DarkRed;
+                treeNode.NodeFont = new Font(treeView.Font, FontStyle.Bold);
+            }
+            else if (intensity >= 0.2f)
+            {
+                treeNode.ForeColor = Color.DarkOrange;
+            }
+            else
+            {
+                treeNode.ForeColor = Color.Gray;
+            }
+        }
+
+        private void BuildTreeRecursive(TreeNode parentTreeNode, HeatmapNode parentHeatmapNode)
+        {
+            if (parentHeatmapNode.Children.Count == 0)
+                return;
+
+            // Sort children by frequency (most frequent first)
+            var sortedChildren = parentHeatmapNode.Children
+                .OrderByDescending(c => c.Frequency)
+                .ToList();
+
+            // If there's only one child, continue inline without showing stats
+            if (sortedChildren.Count == 1)
+            {
+                var child = sortedChildren[0];
+                
+                // Collect all moves in the linear sequence
+                var sequence = new List<(int moveNum, bool isWhite, string san, HeatmapNode node)>();
+                var currentNode = child;
+                var lastNode = child;
+                
+                while (currentNode != null && currentNode.Children.Count <= 1)
+                {
+                    sequence.Add((currentNode.MoveNumber, currentNode.IsWhiteMove, currentNode.San, currentNode));
+                    lastNode = currentNode;
+                    currentNode = currentNode.Children.Count == 1 ? currentNode.Children[0] : null;
+                }
+                
+                // Format the sequence: "1.e4 c5 2.Nf3 d6 3.d4 cxd4"
+                var formatted = new System.Text.StringBuilder();
+                
+                for (int i = 0; i < sequence.Count; i++)
+                {
+                    var (moveNum, isWhite, san, node) = sequence[i];
+                    
+                    if (isWhite)
+                    {
+                        // Add space before if not first
+                        if (formatted.Length > 0) formatted.Append(" ");
+                        formatted.Append($"{moveNum}.{san}");
+                        
+                        // Check if next move is black and has same move number
+                        if (i + 1 < sequence.Count && 
+                            !sequence[i + 1].isWhite && 
+                            sequence[i + 1].moveNum == moveNum)
+                        {
+                            // Add black's response: "1.e4 c5"
+                            formatted.Append($" {sequence[i + 1].san}");
+                            i++; // Skip next move since we already added it
+                        }
+                    }
+                    else
+                    {
+                        // Black move without preceding white move in this sequence
+                        // This happens at branch points
+                        if (formatted.Length > 0) formatted.Append(" ");
+                        formatted.Append($"{moveNum}...{san}");
+                    }
+                }
+                
+                var treeNode = new TreeNode(formatted.ToString());
+                // Store the FIRST node (which has the most games) for tooltip/double-click
+                treeNode.Tag = child;
+                nodeToHeatmap[treeNode] = child;
+                ColorCodeNode(treeNode, child, parentHeatmapNode);
+                
+                // Only add if we actually formatted something
+                if (formatted.Length > 0)
+                {
+                    parentTreeNode.Nodes.Add(treeNode);
+                    
+                    // Continue recursively from the last node in the sequence
+                    if (lastNode.Children.Count > 0)
+                    {
+                        BuildTreeRecursive(treeNode, lastNode);
+                    }
+                }
+                else
+                {
+                    // Fallback: if formatting failed, show as a branch with stats
+                    int totalGames = parentHeatmapNode.Frequency;
+                    double percentage = totalGames > 0 ? (child.Frequency * 100.0 / totalGames) : 0;
+                    string moveNum = GetMoveNumberString(child.MoveNumber, child.IsWhiteMove);
+                    string nodeText = $"{moveNum}{child.San} ({child.Frequency}/{totalGames} = {percentage:F1}%)";
+                    
+                    var fallbackNode = new TreeNode(nodeText);
+                    fallbackNode.Tag = child;
+                    nodeToHeatmap[fallbackNode] = child;
+                    ColorCodeNode(fallbackNode, child, parentHeatmapNode);
+                    parentTreeNode.Nodes.Add(fallbackNode);
+                    
+                    // Continue from the fallback node
+                    if (lastNode.Children.Count > 0)
+                    {
+                        BuildTreeRecursive(fallbackNode, child);
+                    }
+                    return;
+                }
+                
+                return;
+            }
+
+            // Multiple branches - show each with stats
+            foreach (var child in sortedChildren)
+            {
+                int totalGames = parentHeatmapNode.Frequency;
+                double percentage = totalGames > 0 ? (child.Frequency * 100.0 / totalGames) : 0;
+
+                string moveNum = GetMoveNumberString(child.MoveNumber, child.IsWhiteMove);
+                string nodeText = $"{moveNum}{child.San} ({child.Frequency}/{totalGames} = {percentage:F1}%)";
+
+                var treeNode = new TreeNode(nodeText);
+                treeNode.Tag = child;
+                nodeToHeatmap[treeNode] = child;
+                ColorCodeNode(treeNode, child, parentHeatmapNode);
+                parentTreeNode.Nodes.Add(treeNode);
+
+                // Recurse
+                BuildTreeRecursive(treeNode, child);
+            }
+        }
+
+        private void ColorCodeNode(TreeNode treeNode, HeatmapNode heatmapNode, HeatmapNode parent)
+        {
+            int maxFreqAtLevel = parent.Children.Max(c => c.Frequency);
+            float intensity = maxFreqAtLevel > 0 ? (float)heatmapNode.Frequency / maxFreqAtLevel : 0f;
+
+            // Black (rare) -> Red (frequent) gradient
+            if (intensity >= 0.8f)
+            {
+                treeNode.ForeColor = Color.Red;
+                treeNode.NodeFont = new Font(treeView.Font, FontStyle.Bold);
+            }
+            else if (intensity >= 0.5f)
+            {
+                treeNode.ForeColor = Color.DarkRed;
+                treeNode.NodeFont = new Font(treeView.Font, FontStyle.Bold);
+            }
+            else if (intensity >= 0.2f)
+            {
+                treeNode.ForeColor = Color.DarkOrange;
+            }
+            else
+            {
+                treeNode.ForeColor = Color.Gray;
+            }
+        }
+
+        private string GetMoveNumberString(int moveNumber, bool isWhiteMove)
+        {
+            if (isWhiteMove)
+            {
+                return $"{moveNumber}.";
+            }
+            else
+            {
+                return $"{moveNumber}...";
+            }
+        }
+
+        private void TreeView_NodeMouseClick(object? sender, TreeNodeMouseClickEventArgs e)
+        {
+            if (e.Node != null && nodeToHeatmap.ContainsKey(e.Node))
+            {
+                var heatmapNode = nodeToHeatmap[e.Node];
+                ShowNodeTooltip(e.Node, heatmapNode);
+            }
+        }
+
+        private void TreeView_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
+        {
+            if (e.Node != null && nodeToHeatmap.ContainsKey(e.Node))
+            {
+                var heatmapNode = nodeToHeatmap[e.Node];
+                ShowGameDetails(heatmapNode);
+            }
+        }
+
+        private void ShowNodeTooltip(TreeNode treeNode, HeatmapNode heatmapNode)
+        {
+            if (!showTooltips)
+            {
+                toolTip.SetToolTip(treeView, "");
+                return;
+            }
+
+            // Build tooltip text
+            var (wins, losses, draws) = heatmapNode.GetStats(rbWhite.Checked);
+
+            string tooltip = $"Move: {heatmapNode.San}\n";
+            tooltip += $"Played: {heatmapNode.Frequency} times\n";
+            tooltip += $"Results: {wins}W-{losses}L-{draws}D\n\n";
+            tooltip += "Sample games:\n";
+
+            int count = 0;
+            foreach (var game in heatmapNode.Games.Take(5))
+            {
+                string white = game.Tags.TryGetValue("White", out var w) ? w : "?";
+                string black = game.Tags.TryGetValue("Black", out var b) ? b : "?";
+                string result = game.Tags.TryGetValue("Result", out var r) ? r : "*";
+
+                tooltip += $"  {white} vs {black} [{result}]\n";
+                count++;
+            }
+
+            if (heatmapNode.Games.Count > 5)
+            {
+                tooltip += $"  ... and {heatmapNode.Games.Count - 5} more";
+            }
+
+            toolTip.SetToolTip(treeView, tooltip);
+        }
+
+        private void ShowGameDetails(HeatmapNode node)
+        {
+            GameDetailsForm detailsForm = new GameDetailsForm(node, rbWhite.Checked);
+            detailsForm.ShowDialog(this);
+        }
+
+        private void Form1_DragEnter(object? sender, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string[]? files = e.Data.GetData(DataFormats.FileDrop) as string[];
+                if (files != null && files.Any(f => f.EndsWith(".pgn", StringComparison.OrdinalIgnoreCase)))
+                {
+                    e.Effect = DragDropEffects.Copy;
+                    return;
+                }
+            }
+            e.Effect = DragDropEffects.None;
+        }
+
+        private void Form1_DragDrop(object? sender, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string[]? files = e.Data.GetData(DataFormats.FileDrop) as string[];
+                if (files != null)
+                {
+                    var pgnFiles = files.Where(f => f.EndsWith(".pgn", StringComparison.OrdinalIgnoreCase)).ToList();
+
+                    if (pgnFiles.Count > 0)
+                    {
+                        LoadPGNFiles(pgnFiles);
+                        RegistryUtils.SetFileList(pgnFiles);
+                    }
+                }
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            SaveSettings();
+            base.OnFormClosing(e);
+        }
+    }
+}
