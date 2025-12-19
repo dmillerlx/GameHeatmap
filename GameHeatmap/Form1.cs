@@ -360,11 +360,14 @@ namespace GameHeatmap
             showTooltips = showTooltipsPref;
 
             // Load saved files and auto-apply filter
+            // DISABLED: Don't auto-load files at startup (causes OOM with large databases)
+            /*
             var savedFiles = RegistryUtils.GetFileList();
             if (savedFiles.Count > 0)
             {
                 LoadPGNFiles(savedFiles);
             }
+            */
         }
 
         private void SaveSettings()
@@ -402,6 +405,26 @@ namespace GameHeatmap
             {
                 try
                 {
+                    // CRITICAL: Check file size before loading
+                    FileInfo fileInfo = new FileInfo(filePath);
+                    long fileSizeMB = fileInfo.Length / (1024 * 1024);
+                    
+                    if (fileSizeMB > 100)
+                    {
+                        var result = MessageBox.Show(
+                            $"File '{Path.GetFileName(filePath)}' is {fileSizeMB:N0} MB.\n\n" +
+                            $"Large files should be loaded using 'Load Database' button instead.\n\n" +
+                            $"Skip this file?",
+                            "Large File Detected",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Warning);
+                        
+                        if (result == DialogResult.Yes)
+                        {
+                            continue; // Skip this file
+                        }
+                    }
+                    
                     string pgnText = File.ReadAllText(filePath);
                     var games = parser.ParseGames(pgnText);
                     allGames.AddRange(games);
@@ -909,21 +932,33 @@ namespace GameHeatmap
 
         private void BtnLoadDatabase_Click(object? sender, EventArgs e)
         {
-            // Let user browse for the database file
-            using (OpenFileDialog ofd = new OpenFileDialog())
+            try
             {
-                ofd.Filter = "PGN Files (*.pgn)|*.pgn|All Files (*.*)|*.*";
-                ofd.Title = "Select Database PGN File";
-                ofd.InitialDirectory = @"C:\data\chess\chessDatabase";
-                ofd.FileName = "caissabase_export_2024-07-21.pgn";
+                System.Diagnostics.Debug.WriteLine("[BtnLoadDatabase] Button clicked");
+                
+                // Let user browse for the database file
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    System.Diagnostics.Debug.WriteLine("[BtnLoadDatabase] OpenFileDialog created");
+                    
+                    ofd.Filter = "PGN Files (*.pgn)|*.pgn|All Files (*.*)|*.*";
+                    ofd.Title = "Select Database PGN File";
+                    ofd.InitialDirectory = @"C:\data\chess\chessDatabase";
+                    ofd.FileName = "caissabase_export_2024-07-21.pgn";
 
-                if (ofd.ShowDialog() != DialogResult.OK)
-                    return;
+                    System.Diagnostics.Debug.WriteLine("[BtnLoadDatabase] Showing OpenFileDialog...");
+                    if (ofd.ShowDialog() != DialogResult.OK)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[BtnLoadDatabase] Dialog cancelled");
+                        return;
+                    }
 
-                string selectedFile = ofd.FileName;
+                    System.Diagnostics.Debug.WriteLine($"[BtnLoadDatabase] File selected: {ofd.FileName}");
+                    string selectedFile = ofd.FileName;
 
-                // Ask user for number of games to test with
-                using (var inputForm = new Form())
+                    // Ask user for number of games to test with
+                    System.Diagnostics.Debug.WriteLine("[BtnLoadDatabase] Creating input form...");
+                    using (var inputForm = new Form())
                 {
                     inputForm.Text = "Load Database";
                     inputForm.Size = new Size(450, 200);
@@ -998,6 +1033,13 @@ namespace GameHeatmap
                     LoadDatabaseFile(selectedFile, maxGames, threads);
                 }
             }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[BtnLoadDatabase] EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[BtnLoadDatabase] Stack: {ex.StackTrace}");
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadDatabaseFile(string filePath, int maxGames, int numThreads)
@@ -1069,7 +1111,9 @@ namespace GameHeatmap
                 try
                 {
                     int maxDepth = (int)numDepth.Value;
+                    System.Diagnostics.Debug.WriteLine($"[Form1] Creating MoveFrequencyTree with maxDepth={maxDepth}");
                     databaseTree = new MoveFrequencyTree(maxDepth);
+                    System.Diagnostics.Debug.WriteLine($"[Form1] MoveFrequencyTree created successfully");
 
                     var startTime = DateTime.Now;
                     bool isMerging = false;
@@ -1108,7 +1152,16 @@ namespace GameHeatmap
                     // Process on background thread
                     var task = System.Threading.Tasks.Task.Run(() =>
                     {
-                        databaseTree.ProcessPGNFileParallel(filePath, maxGames, progress, numThreads);
+                        if (maxGames == 0)
+                        {
+                            // Full database - use chunked processing
+                            databaseTree.ProcessPGNFileChunked(filePath, 50000, progress);
+                        }
+                        else
+                        {
+                            // Limited games - use parallel processing
+                            databaseTree.ProcessPGNFileParallel(filePath, maxGames, progress, numThreads);
+                        }
                     });
 
                     // Wait for completion while keeping UI responsive
@@ -1194,29 +1247,227 @@ namespace GameHeatmap
 
                 if (ofd.ShowDialog() == DialogResult.OK)
                 {
-                    try
+                    // Show progress form for loading
+                    using (var progressForm = new Form())
                     {
-                        var loadedTree = MoveFrequencyTree.LoadFromFile(ofd.FileName);
-                        if (loadedTree != null)
+                        progressForm.Text = "Loading Database Cache";
+                        progressForm.Size = new Size(500, 260);
+                        progressForm.StartPosition = FormStartPosition.CenterParent;
+                        progressForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                        progressForm.MaximizeBox = false;
+                        progressForm.MinimizeBox = false;
+                        progressForm.ControlBox = false;
+
+                        Label lblTitle = new Label
                         {
-                            databaseTree = loadedTree;
-                            MessageBox.Show($"Database cache loaded successfully!\n\n" +
-                                          $"Games: {databaseTree.TotalGamesProcessed:N0}\n\n" +
-                                          $"Click 'View Database' to see the tree.",
-                                          "Cache Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            btnViewDatabase.Enabled = true;
-                            btnSaveDatabase.Enabled = true;
+                            Text = "Loading database cache...",
+                            Location = new Point(30, 25),
+                            Size = new Size(440, 25),
+                            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                            TextAlign = ContentAlignment.MiddleLeft
+                        };
+                        progressForm.Controls.Add(lblTitle);
+
+                        Label lblStatus = new Label
+                        {
+                            Text = "This may take a minute for large databases.",
+                            Location = new Point(30, 55),
+                            Size = new Size(440, 25),
+                            Font = new Font("Segoe UI", 9),
+                            ForeColor = Color.DarkGray,
+                            TextAlign = ContentAlignment.MiddleLeft
+                        };
+                        progressForm.Controls.Add(lblStatus);
+
+                        Label lblGamesLoaded = new Label
+                        {
+                            Text = "Games loaded: 0",
+                            Location = new Point(30, 85),
+                            Size = new Size(440, 25),
+                            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                            ForeColor = Color.DarkBlue,
+                            TextAlign = ContentAlignment.MiddleLeft
+                        };
+                        progressForm.Controls.Add(lblGamesLoaded);
+
+                        ProgressBar progressBar = new ProgressBar
+                        {
+                            Location = new Point(30, 120),
+                            Size = new Size(440, 35),
+                            Style = ProgressBarStyle.Marquee,
+                            MarqueeAnimationSpeed = 30
+                        };
+                        progressForm.Controls.Add(progressBar);
+
+                        // Declare variables first to avoid circular dependency
+                        bool userCancelled = false;
+                        bool usePartial = false;
+                        Button btnCancel = null!;
+                        Button btnStopAndUse = null!;
+
+                        btnStopAndUse = new Button
+                        {
+                            Text = "Stop & Use Partial",
+                            Location = new Point(260, 175),
+                            Size = new Size(140, 30),
+                            BackColor = Color.LightGreen
+                        };
+                        btnStopAndUse.Click += (s, args) =>
+                        {
+                            usePartial = true;
+                            userCancelled = true; // Stop loading
+                            lblStatus.Text = "Stopping... will use partial data";
+                            btnCancel.Enabled = false;
+                            btnStopAndUse.Enabled = false;
+                        };
+                        progressForm.Controls.Add(btnStopAndUse);
+
+                        btnCancel = new Button
+                        {
+                            Text = "Cancel",
+                            Location = new Point(140, 175),
+                            Size = new Size(100, 30),
+                            DialogResult = DialogResult.Cancel
+                        };
+                        btnCancel.Click += (s, args) =>
+                        {
+                            userCancelled = true;
+                            lblStatus.Text = "Cancelling...";
+                            btnCancel.Enabled = false;
+                            btnStopAndUse.Enabled = false;
+                        };
+                        progressForm.Controls.Add(btnCancel);
+
+                        progressForm.Show();
+                        Application.DoEvents();
+
+                        try
+                        {
+                            var startTime = DateTime.Now;
+                            
+                            // Track progress
+                            long bytesRead = 0;
+                            long totalBytes = 0;
+                            int totalGames = 0;
+                            object progressLock = new object();
+                            var loadProgress = new Progress<(long bytes, long total)>(tuple =>
+                            {
+                                lock (progressLock)
+                                {
+                                    bytesRead = tuple.bytes;
+                                    totalBytes = tuple.total;
+                                }
+                            });
+                            
+                            // Load on background thread to keep UI responsive
+                            MoveFrequencyTree? loadedTree = null;
+                            Exception? loadException = null;
+                            var loadTask = System.Threading.Tasks.Task.Run(() =>
+                            {
+                                try
+                                {
+                                    loadedTree = MoveFrequencyTree.LoadFromFile(
+                                        ofd.FileName,
+                                        loadProgress,
+                                        () => userCancelled
+                                    );
+                                    // Capture total games after loading metadata
+                                    if (loadedTree != null)
+                                    {
+                                        lock (progressLock)
+                                        {
+                                            totalGames = loadedTree.TotalGamesProcessed;
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    loadException = ex;
+                                }
+                            });
+
+                            // Update UI while loading
+                            while (!loadTask.IsCompleted)
+                            {
+                                Application.DoEvents();
+                                var elapsed = DateTime.Now - startTime;
+                                
+                                lock (progressLock)
+                                {
+                                    if (totalBytes > 0)
+                                    {
+                                        double percent = (bytesRead * 100.0) / totalBytes;
+                                        double mbRead = bytesRead / (1024.0 * 1024.0);
+                                        double mbTotal = totalBytes / (1024.0 * 1024.0);
+                                        lblStatus.Text = $"Loading... {percent:F1}% - Elapsed: {elapsed.TotalSeconds:F1}s";
+                                        lblGamesLoaded.Text = $"Read: {mbRead:F1} MB / {mbTotal:F1} MB";
+                                    }
+                                    else
+                                    {
+                                        lblStatus.Text = $"Loading... Elapsed time: {elapsed.TotalSeconds:F1}s";
+                                        lblGamesLoaded.Text = $"Starting...";
+                                    }
+                                }
+                                
+                                System.Threading.Thread.Sleep(100);
+                            }
+
+                            // Wait for task to complete and get final exception if any
+                            try
+                            {
+                                loadTask.Wait();
+                            }
+                            catch { }
+
+                            var totalElapsed = DateTime.Now - startTime;
+                            
+                            // Get final percentage
+                            double finalPercent;
+                            lock (progressLock)
+                            {
+                                finalPercent = totalBytes > 0 ? (bytesRead * 100.0) / totalBytes : 100.0;
+                            }
+                            
+                            progressForm.Close();
+                            
+                            if (userCancelled && !usePartial)
+                            {
+                                MessageBox.Show("Cache loading cancelled by user.",
+                                    "Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                return;
+                            }
+
+                            if (loadException != null && !usePartial)
+                            {
+                                MessageBox.Show($"Error loading cache: {loadException.Message}", "Error",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return;
+                            }
+                            
+                            if (loadedTree != null)
+                            {
+                                databaseTree = loadedTree;
+                                string partialMsg = usePartial ? $" (PARTIAL - {finalPercent:F1}% loaded)" : "";
+                                MessageBox.Show($"Database cache loaded successfully!{partialMsg}\n\n" +
+                                              $"Games: {databaseTree.TotalGamesProcessed:N0}\n" +
+                                              $"Load time: {totalElapsed.TotalSeconds:F1} seconds\n\n" +
+                                              $"Click 'View Database' to see the tree.",
+                                              "Cache Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                btnViewDatabase.Enabled = true;
+                                btnSaveDatabase.Enabled = true;
+                            }
+                            else
+                            {
+                                MessageBox.Show("Failed to load cache file.", "Error",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            MessageBox.Show("Failed to load cache file.", "Error",
+                            progressForm.Close();
+                            MessageBox.Show($"Error loading cache: {ex.Message}", "Error",
                                 MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Error loading cache: {ex.Message}", "Error",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
             }

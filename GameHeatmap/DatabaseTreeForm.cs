@@ -36,6 +36,8 @@ namespace GameHeatmap
                 ShowRootLines = true,
                 Scrollable = true
             };
+            // LAZY LOADING: Populate children only when node is expanded
+            treeView.BeforeExpand += TreeView_BeforeExpand;
             this.Controls.Add(treeView);
 
             // Buttons panel - ADD SECOND (docks at top)
@@ -48,17 +50,25 @@ namespace GameHeatmap
 
             Button btnExpandAll = new Button
             {
-                Text = "Expand All",
+                Text = "Expand All (WARNING: SLOW!)",
                 Location = new Point(5, 5),
-                Size = new Size(100, 25)
+                Size = new Size(200, 25),
+                BackColor = Color.LightCoral
             };
-            btnExpandAll.Click += (s, e) => treeView.ExpandAll();
+            btnExpandAll.Click += (s, e) =>
+            {
+                if (MessageBox.Show("Expanding all nodes in a 5M game database will be VERY slow and may freeze the UI. Continue?",
+                    "Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                {
+                    treeView.ExpandAll();
+                }
+            };
             buttonPanel.Controls.Add(btnExpandAll);
 
             Button btnCollapseAll = new Button
             {
                 Text = "Collapse All",
-                Location = new Point(115, 5),
+                Location = new Point(215, 5),
                 Size = new Size(100, 25)
             };
             btnCollapseAll.Click += (s, e) => treeView.CollapseAll();
@@ -69,7 +79,7 @@ namespace GameHeatmap
             // Legend - ADD THIRD (docks at top)
             Label lblLegend = new Label
             {
-                Text = "Colors: Bold Red (80%+) | Dark Red (50-79%) | Orange (20-49%) | Gray (<20%)  |  Format: Move (frequency = %)",
+                Text = "Colors: Bold Red (80%+) | Dark Red (50-79%) | Orange (20-49%) | Gray (<20%)  |  Format: Move (frequency = %)  |  LAZY LOADING: Expand nodes to see moves",
                 Dock = DockStyle.Top,
                 Height = 25,
                 Font = new Font("Segoe UI", 9),
@@ -105,85 +115,49 @@ namespace GameHeatmap
             }
 
             var root = new TreeNode($"Database ({freqTree.TotalGamesProcessed:N0} games)");
-            BuildTreeRecursive(root, freqTree.Root);
+            root.Tag = freqTree.Root; // Store FrequencyNode for lazy loading
+
+            // LAZY LOADING: Only populate top-level moves initially
+            PopulateChildren(root, freqTree.Root);
+
             treeView.Nodes.Add(root);
             root.Expand();
 
             lblStats.Text = $"Database: {freqTree.TotalGamesProcessed:N0} games | " +
-                          $"Unique first moves: {freqTree.Root.Children.Count} | " +
-                          $"Max frequency: {freqTree.GetMaxFrequency():N0}";
+                          $"Top-level moves: {freqTree.Root.Children.Count} | " +
+                          $"Tree uses LAZY LOADING - expand nodes to see continuations";
         }
 
-        private void BuildTreeRecursive(TreeNode parentTreeNode, FrequencyNode parentFreqNode)
+        private void TreeView_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
+        {
+            if (e.Node == null) return;
+
+            // Check if this node's children need to be populated
+            // Dummy nodes have empty text
+            if (e.Node.Nodes.Count == 1 && string.IsNullOrEmpty(e.Node.Nodes[0].Text))
+            {
+                // Remove dummy node
+                e.Node.Nodes.Clear();
+
+                // Populate real children
+                var freqNode = e.Node.Tag as FrequencyNode;
+                if (freqNode != null)
+                {
+                    PopulateChildren(e.Node, freqNode);
+                }
+            }
+        }
+
+        private void PopulateChildren(TreeNode parentTreeNode, FrequencyNode parentFreqNode)
         {
             if (parentFreqNode.Children.Count == 0)
                 return;
 
-            // Sort children by frequency (most frequent first)
+            // Sort children by frequency
             var sortedChildren = parentFreqNode.Children.Values
                 .OrderByDescending(c => c.Frequency)
                 .ToList();
 
-            // If there's only one child, show as linear continuation
-            if (sortedChildren.Count == 1)
-            {
-                var child = sortedChildren[0];
-                
-                // Collect linear sequence
-                var sequence = new List<(int moveNum, bool isWhite, string san, FrequencyNode node)>();
-                var currentNode = child;
-                var lastNode = child;
-                
-                while (currentNode != null && currentNode.Children.Count <= 1)
-                {
-                    sequence.Add((currentNode.MoveNumber, currentNode.IsWhiteMove, currentNode.San, currentNode));
-                    lastNode = currentNode;
-                    currentNode = currentNode.Children.Count == 1 ? currentNode.Children.Values.First() : null;
-                }
-                
-                // Format sequence
-                var formatted = new System.Text.StringBuilder();
-                
-                for (int i = 0; i < sequence.Count; i++)
-                {
-                    var (moveNum, isWhite, san, node) = sequence[i];
-                    
-                    if (isWhite)
-                    {
-                        if (formatted.Length > 0) formatted.Append(" ");
-                        formatted.Append($"{moveNum}.{san}");
-                        
-                        if (i + 1 < sequence.Count && 
-                            !sequence[i + 1].isWhite && 
-                            sequence[i + 1].moveNum == moveNum)
-                        {
-                            formatted.Append($" {sequence[i + 1].san}");
-                            i++;
-                        }
-                    }
-                    else
-                    {
-                        if (formatted.Length > 0) formatted.Append(" ");
-                        formatted.Append($"{moveNum}...{san}");
-                    }
-                }
-                
-                if (formatted.Length > 0)
-                {
-                    var treeNode = new TreeNode(formatted.ToString());
-                    ColorCodeNode(treeNode, child, parentFreqNode);
-                    parentTreeNode.Nodes.Add(treeNode);
-                    
-                    if (lastNode.Children.Count > 0)
-                    {
-                        BuildTreeRecursive(treeNode, lastNode);
-                    }
-                }
-                
-                return;
-            }
-
-            // Multiple branches - show each with stats
             foreach (var child in sortedChildren)
             {
                 int totalGames = parentFreqNode.Frequency;
@@ -193,10 +167,16 @@ namespace GameHeatmap
                 string nodeText = $"{moveNum}{child.San} ({child.Frequency:N0} = {percentage:F1}%)";
 
                 var treeNode = new TreeNode(nodeText);
+                treeNode.Tag = child; // Store FrequencyNode for lazy loading
                 ColorCodeNode(treeNode, child, parentFreqNode);
-                parentTreeNode.Nodes.Add(treeNode);
 
-                BuildTreeRecursive(treeNode, child);
+                // Add dummy node if this child has children (shows + icon)
+                if (child.Children.Count > 0)
+                {
+                    treeNode.Nodes.Add(new TreeNode("")); // Empty dummy node
+                }
+
+                parentTreeNode.Nodes.Add(treeNode);
             }
         }
 

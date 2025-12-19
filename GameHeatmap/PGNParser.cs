@@ -79,6 +79,19 @@ namespace GameHeatmap
     /// </summary>
     public class PgnParser
     {
+        // Static regex instances - compile once and reuse for all games (prevents memory leak)
+        private static readonly Regex TagRegex = new Regex(@"\[(?<tagName>[A-Za-z0-9_]+)\s+""(?<tagValue>[^""]*)""\]", RegexOptions.Compiled);
+        
+        private static readonly Regex TokenizeRegex = new Regex(@"
+            (?<lparen>\()                |   # (
+            (?<rparen>\))                |   # )
+            (?<comment>\{[^{}]*\})       |   # { ... } single-level
+            (?<nag>\$\d+)                |   # $1, $2, ...
+            (?<r>1-0|0-1|1/2-1/2)   |   # Game results
+            (?<movenum>\d+\.)           |   # e.g. 7.
+            (?<move>[a-zA-Z0-9=+#\-O]{1,6})  # approximate SAN token
+        ", RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
+        
         /// <summary>
         /// Parses one or more PGN games from a string and returns a list of PgnGame objects.
         /// </summary>
@@ -199,9 +212,8 @@ namespace GameHeatmap
         {
             var game = new PgnGame();
 
-            // 1) Extract tags
-            var tagRegex = new Regex(@"\[(?<tagName>[A-Za-z0-9_]+)\s+""(?<tagValue>[^""]*)""\]");
-            var matches = tagRegex.Matches(gameText);
+            // 1) Extract tags using static regex
+            var matches = TagRegex.Matches(gameText);
             foreach (Match match in matches)
             {
                 string tagName = match.Groups["tagName"].Value;
@@ -210,7 +222,7 @@ namespace GameHeatmap
             }
 
             // 2) Remove the tag lines, leaving just move section
-            var moveSection = tagRegex.Replace(gameText, "").Trim();
+            var moveSection = TagRegex.Replace(gameText, "").Trim();
 
             // 3) Tokenize
             var tokens = Tokenize(moveSection);
