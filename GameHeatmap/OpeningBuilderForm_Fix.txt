@@ -1,0 +1,22 @@
+        private List<(string san, int frequency)> FindMovesInTree(FrequencyNode treeNode, List<string> moveSequence, bool isWhiteToMove)
+        {
+            // Navigate to the position in the tree
+            var currentNode = treeNode;
+            
+            foreach (var move in moveSequence)
+            {
+                var child = currentNode.Children.Values.FirstOrDefault(c => c.San == move);
+                if (child == null)
+                    return new List<(string, int)>(); // Position not found in tree
+                
+                currentNode = child;
+            }
+            
+            // Now get all children (opponent responses)
+            var responses = currentNode.Children.Values
+                .Where(c => c.IsWhiteMove == isWhiteToMove) // Make sure it's the right color
+                .Select(c => (c.San, c.Frequency))
+                .ToList();
+            
+            return responses;
+        }

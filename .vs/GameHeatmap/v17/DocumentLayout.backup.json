@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\data\\chess\\apps\\GameHeatmap\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\movefrequencytree.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\movefrequencytree.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
     }
@@ -19,6 +23,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "MoveFrequencyTree.cs",
+              "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\MoveFrequencyTree.cs",
+              "RelativeDocumentMoniker": "GameHeatmap\\MoveFrequencyTree.cs",
+              "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\MoveFrequencyTree.cs",
+              "RelativeToolTip": "GameHeatmap\\MoveFrequencyTree.cs",
+              "ViewState": "AgIAAF8AAAAAAAAAAAAswAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-19T21:33:55.381Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "Form1.cs [Design]",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\Form1.cs",

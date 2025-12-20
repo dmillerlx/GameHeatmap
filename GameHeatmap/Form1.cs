@@ -199,7 +199,20 @@ namespace GameHeatmap
             };
             btnLoadCachedDatabase.Click += BtnLoadCachedDatabase_Click;
             leftPanel.Controls.Add(btnLoadCachedDatabase);
-            yPos += 35;
+            yPos += 40;
+
+            // Opening Builder button
+            Button btnOpeningBuilder = new Button
+            {
+                Text = "Opening Builder",
+                Location = new Point(10, yPos),
+                Size = new Size(300, 35),
+                BackColor = Color.LightGoldenrodYellow,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+            btnOpeningBuilder.Click += BtnOpeningBuilder_Click;
+            leftPanel.Controls.Add(btnOpeningBuilder);
+            yPos += 40;
 
             // Games list
             Label lblGamesLabel = new Label
@@ -359,15 +372,19 @@ namespace GameHeatmap
             chkShowTooltips.Checked = showTooltipsPref;
             showTooltips = showTooltipsPref;
 
-            // Load saved files and auto-apply filter
-            // DISABLED: Don't auto-load files at startup (causes OOM with large databases)
-            /*
-            var savedFiles = RegistryUtils.GetFileList();
-            if (savedFiles.Count > 0)
+            // Auto-load last cache file
+            string lastCachePath = RegistryUtils.GetString("LastCachePath", "");
+            if (!string.IsNullOrEmpty(lastCachePath) && File.Exists(lastCachePath))
             {
-                LoadPGNFiles(savedFiles);
+                AutoLoadCacheFile(lastCachePath);
             }
-            */
+
+            // Auto-load last Theodore PGN files
+            var lastPgnFiles = RegistryUtils.GetFileList();
+            if (lastPgnFiles.Count > 0 && lastPgnFiles.All(File.Exists))
+            {
+                LoadPGNFiles(lastPgnFiles);
+            }
         }
 
         private void SaveSettings()
@@ -376,6 +393,25 @@ namespace GameHeatmap
             RegistryUtils.SetInt("MaxDepth", (int)numDepth.Value);
             RegistryUtils.SetBool("PlayingWhite", rbWhite.Checked);
             RegistryUtils.SetBool("ShowTooltips", chkShowTooltips.Checked);
+        }
+
+        private void AutoLoadCacheFile(string filePath)
+        {
+            try
+            {
+                var tree = MoveFrequencyTree.LoadFromFile(filePath, null, null);
+                if (tree != null)
+                {
+                    databaseTree = tree;
+                    btnViewDatabase.Enabled = true;
+                    btnSaveDatabase.Enabled = true;
+                    lblStatus.Text = $"Auto-loaded cache: {databaseTree.TotalGamesProcessed:N0} games";
+                }
+            }
+            catch
+            {
+                // Silently fail - don't show error on startup
+            }
         }
 
         private void BtnLoadFiles_Click(object? sender, EventArgs e)
@@ -1447,6 +1483,7 @@ namespace GameHeatmap
                             if (loadedTree != null)
                             {
                                 databaseTree = loadedTree;
+                                RegistryUtils.SetString("LastCachePath", ofd.FileName);
                                 string partialMsg = usePartial ? $" (PARTIAL - {finalPercent:F1}% loaded)" : "";
                                 MessageBox.Show($"Database cache loaded successfully!{partialMsg}\n\n" +
                                               $"Games: {databaseTree.TotalGamesProcessed:N0}\n" +
@@ -1470,6 +1507,51 @@ namespace GameHeatmap
                         }
                     }
                 }
+            }
+        }
+
+        private void BtnOpeningBuilder_Click(object? sender, EventArgs e)
+        {
+            // Get Theodore's tree from heatmapBuilder
+            MoveFrequencyTree? theodoreTree = null;
+            if (heatmapBuilder != null)
+            {
+                // Convert HeatmapBuilder to MoveFrequencyTree
+                theodoreTree = ConvertHeatmapToFrequencyTree(heatmapBuilder);
+            }
+
+            // Open the Opening Builder form
+            var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked);
+            builderForm.ShowDialog(this);
+        }
+
+        private MoveFrequencyTree ConvertHeatmapToFrequencyTree(HeatmapBuilder heatmapBuilder)
+        {
+            // Create a new frequency tree with same depth
+            var tree = new MoveFrequencyTree((int)numDepth.Value);
+            
+            // Convert the heatmap tree to frequency tree
+            ConvertHeatmapNode(heatmapBuilder.Root, tree.Root);
+            
+            return tree;
+        }
+        
+        private void ConvertHeatmapNode(HeatmapNode heatmapNode, FrequencyNode freqNode)
+        {
+            foreach (var child in heatmapNode.Children)
+            {
+                var childFreqNode = new FrequencyNode
+                {
+                    San = child.San,
+                    MoveNumber = child.MoveNumber,
+                    IsWhiteMove = child.IsWhiteMove,
+                    Frequency = child.Frequency
+                };
+                
+                freqNode.Children[child.San] = childFreqNode;
+                
+                // Recurse
+                ConvertHeatmapNode(child, childFreqNode);
             }
         }
     }
