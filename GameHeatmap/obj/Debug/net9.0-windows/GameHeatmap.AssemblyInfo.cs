@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GameHeatmap")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+520eb378fd110d98bd211deabf3b4f52079f1dd9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8d8f7952cf566f2a7c86426e00f2413ef7865588")]
 [assembly: System.Reflection.AssemblyProductAttribute("GameHeatmap")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GameHeatmap")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

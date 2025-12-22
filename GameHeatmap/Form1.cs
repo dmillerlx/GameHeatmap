@@ -397,20 +397,191 @@ namespace GameHeatmap
 
         private void AutoLoadCacheFile(string filePath)
         {
-            try
+            // Use the same progress dialog as BtnLoadCachedDatabase_Click
+            using (var progressForm = new Form())
             {
-                var tree = MoveFrequencyTree.LoadFromFile(filePath, null, null);
-                if (tree != null)
+                progressForm.Text = "Loading Database Cache (Startup)";
+                progressForm.Size = new Size(500, 260);
+                progressForm.StartPosition = FormStartPosition.CenterScreen;
+                progressForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                progressForm.MaximizeBox = false;
+                progressForm.MinimizeBox = false;
+                progressForm.ControlBox = false;
+
+                Label lblTitle = new Label
                 {
-                    databaseTree = tree;
-                    btnViewDatabase.Enabled = true;
-                    btnSaveDatabase.Enabled = true;
-                    lblStatus.Text = $"Auto-loaded cache: {databaseTree.TotalGamesProcessed:N0} games";
+                    Text = $"Loading cache: {Path.GetFileName(filePath)}...",
+                    Location = new Point(30, 25),
+                    Size = new Size(440, 25),
+                    Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                progressForm.Controls.Add(lblTitle);
+
+                Label lblStatus = new Label
+                {
+                    Text = "This may take a minute for large databases.",
+                    Location = new Point(30, 55),
+                    Size = new Size(440, 25),
+                    Font = new Font("Segoe UI", 9),
+                    ForeColor = Color.DarkGray,
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                progressForm.Controls.Add(lblStatus);
+
+                Label lblGamesLoaded = new Label
+                {
+                    Text = "Games loaded: 0",
+                    Location = new Point(30, 85),
+                    Size = new Size(440, 25),
+                    Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                    ForeColor = Color.DarkBlue,
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                progressForm.Controls.Add(lblGamesLoaded);
+
+                ProgressBar progressBar = new ProgressBar
+                {
+                    Location = new Point(30, 120),
+                    Size = new Size(440, 35),
+                    Style = ProgressBarStyle.Marquee,
+                    MarqueeAnimationSpeed = 30
+                };
+                progressForm.Controls.Add(progressBar);
+
+                // Declare variables first to avoid circular dependency
+                bool userCancelled = false;
+                bool usePartial = false;
+                Button btnCancel = null!;
+                Button btnStopAndUse = null!;
+
+                btnStopAndUse = new Button
+                {
+                    Text = "Stop & Use Partial",
+                    Location = new Point(260, 175),
+                    Size = new Size(140, 30),
+                    BackColor = Color.LightGreen
+                };
+                btnStopAndUse.Click += (s, args) =>
+                {
+                    usePartial = true;
+                    userCancelled = true;
+                    lblStatus.Text = "Stopping... will use partial data";
+                    btnCancel.Enabled = false;
+                    btnStopAndUse.Enabled = false;
+                };
+                progressForm.Controls.Add(btnStopAndUse);
+
+                btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    Location = new Point(140, 175),
+                    Size = new Size(100, 30),
+                    DialogResult = DialogResult.Cancel
+                };
+                btnCancel.Click += (s, args) =>
+                {
+                    userCancelled = true;
+                    lblStatus.Text = "Cancelling...";
+                    btnCancel.Enabled = false;
+                    btnStopAndUse.Enabled = false;
+                };
+                progressForm.Controls.Add(btnCancel);
+
+                progressForm.Show();
+                Application.DoEvents();
+
+                try
+                {
+                    var startTime = DateTime.Now;
+                    
+                    // Track progress
+                    long bytesRead = 0;
+                    long totalBytes = 0;
+                    object progressLock = new object();
+                    var loadProgress = new Progress<(long bytes, long total)>(tuple =>
+                    {
+                        lock (progressLock)
+                        {
+                            bytesRead = tuple.bytes;
+                            totalBytes = tuple.total;
+                        }
+                    });
+                    
+                    // Load on background thread to keep UI responsive
+                    MoveFrequencyTree? loadedTree = null;
+                    Exception? loadException = null;
+                    var loadTask = System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try
+                        {
+                            loadedTree = MoveFrequencyTree.LoadFromFile(
+                                filePath,
+                                loadProgress,
+                                () => userCancelled
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            loadException = ex;
+                        }
+                    });
+
+                    // Update UI while loading
+                    while (!loadTask.IsCompleted)
+                    {
+                        Application.DoEvents();
+                        var elapsed = DateTime.Now - startTime;
+                        
+                        lock (progressLock)
+                        {
+                            if (totalBytes > 0)
+                            {
+                                double percent = (bytesRead * 100.0) / totalBytes;
+                                double mbRead = bytesRead / (1024.0 * 1024.0);
+                                double mbTotal = totalBytes / (1024.0 * 1024.0);
+                                lblStatus.Text = $"Loading... {percent:F1}% - Elapsed: {elapsed.TotalSeconds:F1}s";
+                                lblGamesLoaded.Text = $"Read: {mbRead:F1} MB / {mbTotal:F1} MB";
+                            }
+                            else
+                            {
+                                lblStatus.Text = $"Loading... Elapsed time: {elapsed.TotalSeconds:F1}s";
+                                lblGamesLoaded.Text = $"Starting...";
+                            }
+                        }
+                        
+                        System.Threading.Thread.Sleep(100);
+                    }
+
+                    // Wait for task to complete
+                    try
+                    {
+                        loadTask.Wait();
+                    }
+                    catch { }
+
+                    progressForm.Close();
+                    
+                    if (userCancelled && !usePartial)
+                    {
+                        // User cancelled - continue without database
+                        return;
+                    }
+                    
+                    if (loadedTree != null)
+                    {
+                        databaseTree = loadedTree;
+                        btnViewDatabase.Enabled = true;
+                        btnSaveDatabase.Enabled = true;
+                        lblStatus.Text = $"Auto-loaded cache: {databaseTree.TotalGamesProcessed:N0} games";
+                    }
+                    // Silently fail if error - don't show error on startup
                 }
-            }
-            catch
-            {
-                // Silently fail - don't show error on startup
+                catch (Exception)
+                {
+                    progressForm.Close();
+                    // Silently fail - don't show error on startup
+                }
             }
         }
 

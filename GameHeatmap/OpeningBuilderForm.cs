@@ -29,6 +29,7 @@ namespace GameHeatmap
         private CheckBox chkUseDatabaseGames;
         private CheckBox chkIncludeTheodoreAnnotations;
         private CheckBox chkIncludeDatabaseAnnotations;
+        private CheckBox chkUseShortComments;
         private Label lblTheodoreColor;
         
         // Data
@@ -38,6 +39,7 @@ namespace GameHeatmap
         private PgnGame? mainlineGame;
         private string generatedPgn = "";
         private string lastPgnPath = "";
+        private MoveNode? outputRoot = null;  // Store the generated tree
         
         public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, MoveFrequencyTree? databaseTree, bool theodorePlaysWhite)
         {
@@ -59,6 +61,7 @@ namespace GameHeatmap
             numStartMove.Value = RegistryUtils.GetInt("OpeningBuilder_StartMove", 4);
             chkIncludeTheodoreAnnotations.Checked = RegistryUtils.GetInt("OpeningBuilder_IncludeTheodoreAnnotations", 1) == 1;
             chkIncludeDatabaseAnnotations.Checked = RegistryUtils.GetInt("OpeningBuilder_IncludeDatabaseAnnotations", 1) == 1;
+            chkUseShortComments.Checked = RegistryUtils.GetInt("OpeningBuilder_UseShortComments", 0) == 1;
         }
         
         private void SaveSettings()
@@ -70,6 +73,7 @@ namespace GameHeatmap
             RegistryUtils.SetInt("OpeningBuilder_StartMove", (int)numStartMove.Value);
             RegistryUtils.SetInt("OpeningBuilder_IncludeTheodoreAnnotations", chkIncludeTheodoreAnnotations.Checked ? 1 : 0);
             RegistryUtils.SetInt("OpeningBuilder_IncludeDatabaseAnnotations", chkIncludeDatabaseAnnotations.Checked ? 1 : 0);
+            RegistryUtils.SetInt("OpeningBuilder_UseShortComments", chkUseShortComments.Checked ? 1 : 0);
         }
         
         private void AutoLoadLastPgn()
@@ -166,7 +170,7 @@ namespace GameHeatmap
             splitContainer.Panel2.Controls.Add(rightPanel);
             
             // TOP PANEL - Configuration
-            Panel topPanel = new Panel { Dock = DockStyle.Top, Height = 140, Padding = new Padding(10) };
+            Panel topPanel = new Panel { Dock = DockStyle.Top, Height = 160, Padding = new Padding(10) };
             
             // Theodore plays as
             lblTheodoreColor = new Label
@@ -284,6 +288,7 @@ namespace GameHeatmap
                 Size = new Size(200, 25),
                 Checked = true
             };
+            chkIncludeTheodoreAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
             topPanel.Controls.Add(chkIncludeTheodoreAnnotations);
             
             chkIncludeDatabaseAnnotations = new CheckBox
@@ -293,7 +298,18 @@ namespace GameHeatmap
                 Size = new Size(200, 25),
                 Checked = true
             };
+            chkIncludeDatabaseAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
             topPanel.Controls.Add(chkIncludeDatabaseAnnotations);
+            
+            chkUseShortComments = new CheckBox
+            {
+                Text = "Use Short Comments (T/DB)",
+                Location = new Point(430, 75),
+                Size = new Size(200, 25),
+                Checked = false
+            };
+            chkUseShortComments.CheckedChanged += AnnotationCheckbox_CheckedChanged;
+            topPanel.Controls.Add(chkUseShortComments);
             
             // Buttons
             btnGenerate = new Button
@@ -435,7 +451,7 @@ namespace GameHeatmap
             int startMove = (int)numStartMove.Value;
             
             // Create output tree by copying mainline
-            var outputRoot = CopyMoveTree(mainlineGame!.MoveTreeRoot);
+            outputRoot = CopyMoveTree(mainlineGame!.MoveTreeRoot);
             
             // Build variations by traversing the mainline and adding opponent responses
             BuildVariations(outputRoot, 0, maxDepth, maxBranches, percentThreshold, startMove);
@@ -449,6 +465,15 @@ namespace GameHeatmap
             
             //MessageBox.Show("Opening tree generated successfully!\n\nExpand the tree to see variations.",
             //    "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        
+        private void AnnotationCheckbox_CheckedChanged(object? sender, EventArgs e)
+        {
+            // Refresh the PGN if we have a generated tree
+            if (outputRoot != null)
+            {
+                generatedPgn = GeneratePgn(outputRoot);
+            }
         }
         
         private MoveNode CopyMoveTree(MoveNode source, bool isWhiteToMove = true)
@@ -691,56 +716,73 @@ namespace GameHeatmap
         private List<(string san, string source, int frequency)> FindOpponentMoves(
             MoveNode currentPosition, string mainlineSan, int maxBranches, int percentThreshold, bool isWhiteToMove)
         {
-            var moves = new Dictionary<string, (int theoFreq, int dbFreq)>();
+            // Separate Theodore and Database moves
+            var theodoreMoves = new Dictionary<string, int>();
+            var databaseMoves = new Dictionary<string, int>();
             var moveSequence = GetMoveSequence(currentPosition);
             
-            // Theodore's tree
+            // Get Theodore's moves
             if (chkUseTheodoreGames.Checked && theodoreTree != null)
             {
-                var theodoreMoves = FindMovesInTree(theodoreTree.Root, moveSequence, isWhiteToMove);
-                foreach (var (san, freq) in theodoreMoves)
+                var moves = FindMovesInTree(theodoreTree.Root, moveSequence, isWhiteToMove);
+                foreach (var (san, freq) in moves)
                 {
-                    if (!moves.ContainsKey(san))
-                        moves[san] = (freq, 0);
-                    else
-                        moves[san] = (moves[san].theoFreq + freq, moves[san].dbFreq);
+                    theodoreMoves[san] = freq;
                 }
             }
             
-            // Database tree
+            // Get Database moves - apply maxBranches and threshold here
             if (chkUseDatabaseGames.Checked && databaseTree != null)
             {
-                var dbMoves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove);
-                foreach (var (san, freq) in dbMoves)
+                var moves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove);
+                var sortedDbMoves = moves.OrderByDescending(m => m.frequency).ToList();
+                
+                if (sortedDbMoves.Count > 0)
                 {
-                    if (!moves.ContainsKey(san))
-                        moves[san] = (0, freq);
-                    else
-                        moves[san] = (moves[san].theoFreq, moves[san].dbFreq + freq);
+                    int totalGames = sortedDbMoves.Sum(m => m.frequency);
+                    int cumulativeGames = 0;
+                    int branchCount = 0;
+                    
+                    foreach (var (san, freq) in sortedDbMoves)
+                    {
+                        cumulativeGames += freq;
+                        double percentage = (cumulativeGames * 100.0) / totalGames;
+                        
+                        databaseMoves[san] = freq;
+                        branchCount++;
+                        
+                        // Stop after maxBranches or percentThreshold
+                        if (branchCount >= maxBranches || percentage >= percentThreshold)
+                            break;
+                    }
                 }
             }
             
-            var sortedMoves = moves.OrderByDescending(m => m.Value.theoFreq + m.Value.dbFreq).ToList();
-            if (sortedMoves.Count == 0)
-                return new List<(string, string, int)>();
-            
-            int totalGames = sortedMoves.Sum(m => m.Value.theoFreq + m.Value.dbFreq);
-            int cumulativeGames = 0;
+            // Combine results - ALL Theodore moves + limited Database moves
             var result = new List<(string san, string source, int frequency)>();
+            var allMoves = new Dictionary<string, (int theoFreq, int dbFreq)>();
+            
+            foreach (var kvp in theodoreMoves)
+            {
+                allMoves[kvp.Key] = (kvp.Value, databaseMoves.GetValueOrDefault(kvp.Key, 0));
+            }
+            
+            foreach (var kvp in databaseMoves)
+            {
+                if (!allMoves.ContainsKey(kvp.Key))
+                {
+                    allMoves[kvp.Key] = (0, kvp.Value);
+                }
+            }
+            
+            // Sort by total frequency
+            var sortedMoves = allMoves.OrderByDescending(m => m.Value.theoFreq + m.Value.dbFreq).ToList();
             
             foreach (var move in sortedMoves)
             {
-                cumulativeGames += move.Value.theoFreq + move.Value.dbFreq;
-                double percentage = (cumulativeGames * 100.0) / totalGames;
-                
-                // Build source string showing both frequencies
                 string source = BuildSourceString(move.Value.theoFreq, move.Value.dbFreq);
                 int totalFreq = move.Value.theoFreq + move.Value.dbFreq;
-                
                 result.Add((move.Key, source, totalFreq));
-                
-                if (result.Count >= maxBranches || percentage >= percentThreshold)
-                    break;
             }
             
             return result;
@@ -910,7 +952,7 @@ namespace GameHeatmap
                 
                 // Format like Form1: white = "N.", black = "N..."
                 string moveNum = moveByWhite ? $"{child.MoveNumber}." : $"{child.MoveNumber}...";
-                string comment = !string.IsNullOrEmpty(child.Comment) ? $" {{ {child.Comment} }}" : "";
+                string comment = !string.IsNullOrEmpty(child.Comment) && !child.Comment.StartsWith("[MAINLINE]") ? $" {{ {child.Comment} }}" : "";
                 
                 var treeNode = new TreeNode($"{moveNum}{child.San}{comment}");
                 
@@ -965,82 +1007,119 @@ namespace GameHeatmap
             return sb.ToString();
         }
         
-        private void WriteMovesPgn(MoveNode node, StringBuilder sb)
+        private void WriteMovesPgn(MoveNode node, StringBuilder sb, bool isFirstMove = true, MoveNode? previousMove = null)
         {
             if (node.NextMoves.Count == 0)
                 return;
             
-            var mainline = node.NextMoves[0];
-            bool moveByWhite = !mainline.isWhiteTurn;
-            string moveNum = moveByWhite ? $"{mainline.MoveNumber}." : $"{mainline.MoveNumber}...";
-            
-            // Handle comment based on checkbox
-            string comment = "";
-            if (!string.IsNullOrEmpty(mainline.Comment))
+            // Write all children: first child as mainline, rest as variations
+            for (int i = 0; i < node.NextMoves.Count; i++)
             {
-                // Strip [MAINLINE] marker if present
-                string commentText = mainline.Comment.StartsWith("[MAINLINE]") 
-                    ? mainline.Comment.Substring(10) 
-                    : mainline.Comment;
+                var child = node.NextMoves[i];
+                bool moveByWhite = !child.isWhiteTurn;
                 
-                // Filter and rebuild based on checkboxes
-                string filteredComment = FilterComment(commentText);
-                if (!string.IsNullOrEmpty(filteredComment))
-                    comment = $" {{ {filteredComment} }}";
+                if (i == 0)
+                {
+                    // Mainline: write the move and recurse
+                    string moveNum = "";
+                    bool prevWasWhiteSameNumber = previousMove != null && 
+                                                  !previousMove.isWhiteTurn && 
+                                                  previousMove.MoveNumber == child.MoveNumber;
+                    
+                    if (isFirstMove)
+                    {
+                        moveNum = moveByWhite ? $"{child.MoveNumber}." : $"{child.MoveNumber}...";
+                    }
+                    else if (moveByWhite)
+                    {
+                        moveNum = $"{child.MoveNumber}.";
+                    }
+                    else if (!prevWasWhiteSameNumber)
+                    {
+                        moveNum = $"{child.MoveNumber}...";
+                    }
+                    
+                    string comment = "";
+                    if (!string.IsNullOrEmpty(child.Comment))
+                    {
+                        string commentText = child.Comment.StartsWith("[MAINLINE]") 
+                            ? child.Comment.Substring(10) 
+                            : child.Comment;
+                        string filteredComment = FilterComment(commentText);
+                        if (!string.IsNullOrEmpty(filteredComment))
+                            comment = $" {{ {filteredComment} }}";
+                    }
+                    
+                    sb.Append($"{moveNum}{child.San}{comment} ");
+                    
+                    // Don't recurse yet - first write variations at this level
+                }
+                else
+                {
+                    // Variation: wrap in parentheses
+                    sb.Append("(");
+                    WriteVariationPgn(child, sb, true, null);
+                    sb.Append(") ");
+                }
             }
             
-            sb.Append($"{moveNum}{mainline.San}{comment} ");
-            
-            // Write variations (with full subtrees)
-            for (int i = 1; i < node.NextMoves.Count; i++)
+            // Now recurse on the mainline
+            if (node.NextMoves.Count > 0)
             {
-                var variation = node.NextMoves[i];
-                sb.Append("(");
-                WriteVariationPgn(variation, sb);
-                sb.Append(") ");
+                WriteMovesPgn(node.NextMoves[0], sb, false, node.NextMoves[0]);
             }
-            
-            // Continue mainline
-            WriteMovesPgn(mainline, sb);
         }
         
-        private void WriteVariationPgn(MoveNode node, StringBuilder sb)
+        private void WriteVariationPgn(MoveNode node, StringBuilder sb, bool isFirstInVariation = true, MoveNode? previousMove = null)
         {
             bool moveByWhite = !node.isWhiteTurn;
-            string moveNum = moveByWhite ? $"{node.MoveNumber}." : $"{node.MoveNumber}...";
+            string moveNum = "";
             
-            // Handle comment based on checkbox
+            // Determine if we need move number
+            bool prevWasWhiteSameNumber = previousMove != null && 
+                                          !previousMove.isWhiteTurn && 
+                                          previousMove.MoveNumber == node.MoveNumber;
+            
+            if (isFirstInVariation)
+            {
+                moveNum = moveByWhite ? $"{node.MoveNumber}." : $"{node.MoveNumber}...";
+            }
+            else if (moveByWhite)
+            {
+                moveNum = $"{node.MoveNumber}.";
+            }
+            else if (!prevWasWhiteSameNumber)
+            {
+                moveNum = $"{node.MoveNumber}...";
+            }
+            
+            // Handle comment
             string comment = "";
             if (!string.IsNullOrEmpty(node.Comment))
             {
-                // Strip [MAINLINE] marker if present
                 string commentText = node.Comment.StartsWith("[MAINLINE]") 
                     ? node.Comment.Substring(10) 
                     : node.Comment;
-                
-                // Filter and rebuild based on checkboxes
                 string filteredComment = FilterComment(commentText);
                 if (!string.IsNullOrEmpty(filteredComment))
                     comment = $" {{ {filteredComment} }}";
             }
             
+            // Write this move
             sb.Append($"{moveNum}{node.San}{comment} ");
             
-            // If this variation has continuations, write them
+            // Write sub-variations (skip first child which is mainline)
+            for (int i = 1; i < node.NextMoves.Count; i++)
+            {
+                sb.Append("(");
+                WriteVariationPgn(node.NextMoves[i], sb, true, null);
+                sb.Append(") ");
+            }
+            
+            // Continue with mainline
             if (node.NextMoves.Count > 0)
             {
-                // Write the main continuation of this variation
-                var continuation = node.NextMoves[0];
-                WriteVariationPgn(continuation, sb);
-                
-                // Write sub-variations
-                for (int i = 1; i < node.NextMoves.Count; i++)
-                {
-                    var subVariation = node.NextMoves[i];
-                    sb.Append("(");
-                    WriteVariationPgn(subVariation, sb);
-                    sb.Append(") ");
-                }
+                WriteVariationPgn(node.NextMoves[0], sb, false, node);
             }
         }
         
@@ -1067,23 +1146,68 @@ namespace GameHeatmap
                         dbGames = parts[i + 1];
                 }
                 
-                // Rebuild based on what's checked
+                // Rebuild based on what's checked and format preference
                 List<string> components = new List<string>();
-                if (chkIncludeTheodoreAnnotations.Checked && !string.IsNullOrEmpty(theoGames))
-                    components.Add($"Theodore: {theoGames}");
-                if (chkIncludeDatabaseAnnotations.Checked && !string.IsNullOrEmpty(dbGames))
-                    components.Add($"Database: {dbGames}");
                 
-                return components.Count > 0 ? string.Join(", ", components) : "";
+                if (chkUseShortComments.Checked)
+                {
+                    // Short format: "T 100 DB 485"
+                    if (chkIncludeTheodoreAnnotations.Checked && !string.IsNullOrEmpty(theoGames))
+                        components.Add($"T {theoGames}");
+                    if (chkIncludeDatabaseAnnotations.Checked && !string.IsNullOrEmpty(dbGames))
+                        components.Add($"DB {dbGames}");
+                    return components.Count > 0 ? string.Join(" ", components) : "";
+                }
+                else
+                {
+                    // Long format: "Theodore: 100, Database: 485"
+                    if (chkIncludeTheodoreAnnotations.Checked && !string.IsNullOrEmpty(theoGames))
+                        components.Add($"Theodore: {theoGames}");
+                    if (chkIncludeDatabaseAnnotations.Checked && !string.IsNullOrEmpty(dbGames))
+                        components.Add($"Database: {dbGames}");
+                    return components.Count > 0 ? string.Join(", ", components) : "";
+                }
             }
             
             // If only Theodore, include if Theodore checkbox is checked
             if (hasTheodore)
-                return chkIncludeTheodoreAnnotations.Checked ? comment : "";
+            {
+                if (!chkIncludeTheodoreAnnotations.Checked)
+                    return "";
+                    
+                // Extract the number
+                if (chkUseShortComments.Checked)
+                {
+                    // Short format: "T 100"
+                    var parts = comment.Split(new[] { ' ', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                    for (int i = 0; i < parts.Length; i++)
+                    {
+                        if (parts[i] == "Theodore" && i + 1 < parts.Length)
+                            return $"T {parts[i + 1]}";
+                    }
+                }
+                return comment; // Return original if long format
+            }
             
             // If only Database, include if Database checkbox is checked  
             if (hasDatabase)
-                return chkIncludeDatabaseAnnotations.Checked ? comment : "";
+            {
+                if (!chkIncludeDatabaseAnnotations.Checked)
+                    return "";
+                    
+                // Extract the number
+                if (chkUseShortComments.Checked)
+                {
+                    // Short format: "DB 485"
+                    var parts = comment.Split(new[] { ' ', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                    for (int i = 0; i < parts.Length; i++)
+                    {
+                        if (parts[i] == "Database" && i + 1 < parts.Length)
+                            return $"DB {parts[i + 1]}";
+                    }
+                }
+                return comment; // Return original if long format
+            }
             
             // Other comments (like debug messages) - always include
             return comment;

@@ -30,9 +30,9 @@
               "Title": "OpeningBuilderForm.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\OpeningBuilderForm.cs",
-              "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs*",
-              "RelativeToolTip": "GameHeatmap\\OpeningBuilderForm.cs*",
-              "ViewState": "AgIAAKwBAAAAAAAAAAAnwMABAAAAAAAAAAAAAA==",
+              "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
+              "RelativeToolTip": "GameHeatmap\\OpeningBuilderForm.cs",
+              "ViewState": "AgIAALwBAAAAAAAAAAAnwNkBAAANAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-12-20T01:12:58.268Z",
               "EditorCaption": ""
@@ -47,8 +47,7 @@
               "RelativeToolTip": "GameHeatmap\\MoveFrequencyTree.cs",
               "ViewState": "AgIAAF8AAAAAAAAAAAAswGcAAAA9AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-19T21:33:55.381Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-19T21:33:55.381Z"
             },
             {
               "$type": "Document",
