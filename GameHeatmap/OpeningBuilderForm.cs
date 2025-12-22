@@ -1114,7 +1114,11 @@ namespace GameHeatmap
                         }
                         
                         sb.Append($"{continuation.MoveNumber}... {continuation.San}{contComment} ");
-                        WriteMovesPgn(continuation, sb, false, continuation);
+                        // Continue from continuation's CHILDREN, not from continuation itself
+                        if (continuation.NextMoves.Count > 0)
+                        {
+                            WriteMovesPgn(continuation, sb, false, continuation);
+                        }
                         return;
                     }
                 }
@@ -1224,7 +1228,11 @@ namespace GameHeatmap
                         }
                         
                         sb.Append($"{continuation.MoveNumber}... {continuation.San}{contComment} ");
-                        WriteVariationPgn(continuation, sb, false, continuation);
+                        // Continue from continuation's CHILDREN, not from continuation itself
+                        if (continuation.NextMoves.Count > 0)
+                        {
+                            WriteVariationPgn(continuation, sb, false, continuation);
+                        }
                         return;
                     }
                 }
