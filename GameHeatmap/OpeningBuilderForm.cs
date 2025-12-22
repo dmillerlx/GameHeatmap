@@ -1031,6 +1031,8 @@ namespace GameHeatmap
             var mainline = node.NextMoves[0];
             bool moveByWhite = !mainline.isWhiteTurn;
             
+            Console.WriteLine($"WriteMovesPgn: Processing mainline={mainline.San}, moveNum={mainline.MoveNumber}, white={moveByWhite}, children={mainline.NextMoves.Count}");
+            
             // Determine if we need a move number
             string moveNum = "";
             bool prevWasWhiteSameNumber = previousMove != null && 
@@ -1062,15 +1064,20 @@ namespace GameHeatmap
             }
             
             // Write the mainline move
+            Console.WriteLine($"  Writing: {moveNum}{mainline.San}{comment}");
             sb.Append($"{moveNum}{mainline.San}{comment} ");
             
             // Check if mainline has variations (multiple children)
             if (mainline.NextMoves.Count > 1)
             {
+                Console.WriteLine($"  Mainline has {mainline.NextMoves.Count} children (variations present)");
+                
                 // Write the first child of mainline
                 var nextMainline = mainline.NextMoves[0];
                 bool nextMoveByWhite = !nextMainline.isWhiteTurn;
                 string nextMoveNum = nextMoveByWhite ? $"{nextMainline.MoveNumber}. " : $"{nextMainline.MoveNumber}... ";
+                
+                Console.WriteLine($"  Writing first child: {nextMoveNum}{nextMainline.San}");
                 
                 string nextComment = "";
                 if (!string.IsNullOrEmpty(nextMainline.Comment))
@@ -1086,63 +1093,46 @@ namespace GameHeatmap
                 sb.Append($"{nextMoveNum}{nextMainline.San}{nextComment} ");
                 
                 // Write variations (siblings of nextMainline)
+                Console.WriteLine($"  Writing {mainline.NextMoves.Count - 1} variations");
                 for (int i = 1; i < mainline.NextMoves.Count; i++)
                 {
+                    Console.WriteLine($"    Variation {i}: {mainline.NextMoves[i].San}");
                     sb.Append("(");
                     WriteVariationPgn(mainline.NextMoves[i], sb, true, null);
                     sb.Append(") ");
                 }
                 
-                // Continue from nextMainline (with "..." if needed)
-                if (nextMainline.NextMoves.Count > 0)
-                {
-                    var continuation = nextMainline.NextMoves[0];
-                    bool contMoveByWhite = !continuation.isWhiteTurn;
-                    
-                    // If continuation is black and previous was white with same number, need "..."
-                    if (!contMoveByWhite && nextMoveByWhite && continuation.MoveNumber == nextMainline.MoveNumber)
-                    {
-                        string contComment = "";
-                        if (!string.IsNullOrEmpty(continuation.Comment))
-                        {
-                            string commentText = continuation.Comment.StartsWith("[MAINLINE]") 
-                                ? continuation.Comment.Substring(10) 
-                                : continuation.Comment;
-                            string filteredComment = FilterComment(commentText);
-                            if (!string.IsNullOrEmpty(filteredComment))
-                                contComment = $" {{ {filteredComment} }}";
-                        }
-                        
-                        sb.Append($"{continuation.MoveNumber}... {continuation.San}{contComment} ");
-                        // Continue from continuation's CHILDREN, not from continuation itself
-                        if (continuation.NextMoves.Count > 0)
-                        {
-                            WriteMovesPgn(continuation, sb, false, continuation);
-                        }
-                        return;
-                    }
-                }
-                
+                // Now continue from nextMainline (already written above)
+                Console.WriteLine($"  Recursing from nextMainline: {nextMainline.San}");
                 WriteMovesPgn(nextMainline, sb, false, nextMainline);
                 return;
             }
             
             // Write variations at parent level (alternatives to mainline itself)
+            if (node.NextMoves.Count > 1)
+            {
+                Console.WriteLine($"  Node has {node.NextMoves.Count} children - writing parent-level variations");
+            }
             for (int i = 1; i < node.NextMoves.Count; i++)
             {
                 var variation = node.NextMoves[i];
+                Console.WriteLine($"    Parent variation {i}: {variation.San}");
                 sb.Append("(");
                 WriteVariationPgn(variation, sb, true, null);
                 sb.Append(") ");
             }
             
             // Normal continuation
+            Console.WriteLine($"  Normal recursion from mainline: {mainline.San}");
             WriteMovesPgn(mainline, sb, false, mainline);
         }
         
         private void WriteVariationPgn(MoveNode node, StringBuilder sb, bool isFirstInVariation = true, MoveNode? previousMove = null)
         {
             bool moveByWhite = !node.isWhiteTurn;
+            
+            Console.WriteLine($"  WriteVariationPgn: node={node.San}, moveNum={node.MoveNumber}, white={moveByWhite}, children={node.NextMoves.Count}, isFirst={isFirstInVariation}");
+            
             string moveNum = "";
             
             // Determine if we need move number
@@ -1176,15 +1166,20 @@ namespace GameHeatmap
             }
             
             // Write this move
+            Console.WriteLine($"    Writing in variation: {moveNum}{node.San}{comment}");
             sb.Append($"{moveNum}{node.San}{comment} ");
             
             // Check if this node has multiple children (variations)
             if (node.NextMoves.Count > 1)
             {
+                Console.WriteLine($"    Node has {node.NextMoves.Count} children in variation");
+                
                 // Write the first child
                 var nextMainline = node.NextMoves[0];
                 bool nextMoveByWhite = !nextMainline.isWhiteTurn;
                 string nextMoveNum = nextMoveByWhite ? $"{nextMainline.MoveNumber}. " : $"{nextMainline.MoveNumber}... ";
+                
+                Console.WriteLine($"    Writing first child in variation: {nextMoveNum}{nextMainline.San}");
                 
                 string nextComment = "";
                 if (!string.IsNullOrEmpty(nextMainline.Comment))
@@ -1200,43 +1195,17 @@ namespace GameHeatmap
                 sb.Append($"{nextMoveNum}{nextMainline.San}{nextComment} ");
                 
                 // Write variations (siblings of nextMainline)
+                Console.WriteLine($"    Writing {node.NextMoves.Count - 1} sub-variations");
                 for (int i = 1; i < node.NextMoves.Count; i++)
                 {
+                    Console.WriteLine($"      Sub-variation {i}: {node.NextMoves[i].San}");
                     sb.Append("(");
                     WriteVariationPgn(node.NextMoves[i], sb, true, null);
                     sb.Append(") ");
                 }
                 
-                // Continue from nextMainline (with "..." if needed)
-                if (nextMainline.NextMoves.Count > 0)
-                {
-                    var continuation = nextMainline.NextMoves[0];
-                    bool contMoveByWhite = !continuation.isWhiteTurn;
-                    
-                    // If continuation is black and previous was white with same number, need "..."
-                    if (!contMoveByWhite && nextMoveByWhite && continuation.MoveNumber == nextMainline.MoveNumber)
-                    {
-                        string contComment = "";
-                        if (!string.IsNullOrEmpty(continuation.Comment))
-                        {
-                            string commentText = continuation.Comment.StartsWith("[MAINLINE]") 
-                                ? continuation.Comment.Substring(10) 
-                                : continuation.Comment;
-                            string filteredComment = FilterComment(commentText);
-                            if (!string.IsNullOrEmpty(filteredComment))
-                                contComment = $" {{ {filteredComment} }}";
-                        }
-                        
-                        sb.Append($"{continuation.MoveNumber}... {continuation.San}{contComment} ");
-                        // Continue from continuation's CHILDREN, not from continuation itself
-                        if (continuation.NextMoves.Count > 0)
-                        {
-                            WriteVariationPgn(continuation, sb, false, continuation);
-                        }
-                        return;
-                    }
-                }
-                
+                // Now continue from nextMainline (already written above)
+                Console.WriteLine($"    Recursing in variation from nextMainline: {nextMainline.San}");
                 WriteVariationPgn(nextMainline, sb, false, nextMainline);
                 return;
             }
@@ -1244,7 +1213,12 @@ namespace GameHeatmap
             // Continue with mainline (no variations at this level)
             if (node.NextMoves.Count > 0)
             {
+                Console.WriteLine($"    Normal recursion in variation from: {node.San} to {node.NextMoves[0].San}");
                 WriteVariationPgn(node.NextMoves[0], sb, false, node);
+            }
+            else
+            {
+                Console.WriteLine($"    End of variation at: {node.San}");
             }
         }
         
