@@ -31,6 +31,7 @@ namespace GameHeatmap
         private CheckBox chkIncludeTheodoreAnnotations;
         private CheckBox chkIncludeDatabaseAnnotations;
         private CheckBox chkUseShortComments;
+        private CheckBox chkDebugOutput;
         private Label lblTheodoreColor;
         
         // Data
@@ -311,6 +312,15 @@ namespace GameHeatmap
             };
             chkUseShortComments.CheckedChanged += AnnotationCheckbox_CheckedChanged;
             topPanel.Controls.Add(chkUseShortComments);
+            
+            chkDebugOutput = new CheckBox
+            {
+                Text = "Debug Output (C:\\data\\debug.txt)",
+                Location = new Point(640, 75),
+                Size = new Size(220, 25),
+                Checked = false
+            };
+            topPanel.Controls.Add(chkDebugOutput);
             
             // Buttons
             btnGenerate = new Button
@@ -1022,7 +1032,7 @@ namespace GameHeatmap
             return sb.ToString();
         }
         
-        private void WriteMovesPgn(MoveNode node, StringBuilder sb, bool isFirstMove = true, MoveNode? previousMove = null)
+        private void WriteMovesPgn(MoveNode node, StringBuilder sb, bool isFirstMove = true, MoveNode? previousMove = null, bool afterVariations = false)
         {
             if (node.NextMoves.Count == 0)
                 return;
@@ -1042,14 +1052,39 @@ namespace GameHeatmap
             if (isFirstMove)
             {
                 moveNum = moveByWhite ? $"{mainline.MoveNumber}. " : $"{mainline.MoveNumber}... ";
+                if (chkDebugOutput.Checked)
+                    File.AppendAllText(@"C:\data\debug.txt", $"  First move, moveNum={moveNum}\n");
             }
             else if (moveByWhite)
             {
                 moveNum = $"{mainline.MoveNumber}. ";
+                if (chkDebugOutput.Checked)
+                    File.AppendAllText(@"C:\data\debug.txt", $"  White move, moveNum={moveNum}\n");
             }
-            else if (!prevWasWhiteSameNumber)
+            else if (prevWasWhiteSameNumber)
             {
+                // Black move following white move with same number
+                if (afterVariations)
+                {
+                    // After variations, need "...": "10. O-O-O (vars) 10... Rc8"
+                    moveNum = $"{mainline.MoveNumber}... ";
+                    if (chkDebugOutput.Checked)
+                        File.AppendAllText(@"C:\data\debug.txt", $"  Black after vars, moveNum={moveNum}\n");
+                }
+                else
+                {
+                    // On same line, no move number: "1. e4 c5"
+                    moveNum = "";
+                    if (chkDebugOutput.Checked)
+                        File.AppendAllText(@"C:\data\debug.txt", $"  Black same line, moveNum=(empty)\n");
+                }
+            }
+            else
+            {
+                // Black move needs full notation
                 moveNum = $"{mainline.MoveNumber}... ";
+                if (chkDebugOutput.Checked)
+                    File.AppendAllText(@"C:\data\debug.txt", $"  Black other, moveNum={moveNum}\n");
             }
             
             string comment = "";
@@ -1064,6 +1099,8 @@ namespace GameHeatmap
             }
             
             // Write the mainline move
+            if (chkDebugOutput.Checked)
+                File.AppendAllText(@"C:\data\debug.txt", $"MAIN: {moveNum}{mainline.San}\n");
             Console.WriteLine($"  Writing: {moveNum}{mainline.San}{comment}");
             sb.Append($"{moveNum}{mainline.San}{comment} ");
             
@@ -1090,6 +1127,8 @@ namespace GameHeatmap
                         nextComment = $" {{ {filteredComment} }}";
                 }
                 
+                if (chkDebugOutput.Checked)
+                    File.AppendAllText(@"C:\data\debug.txt", $"CHILD: {nextMoveNum}{nextMainline.San}\n");
                 sb.Append($"{nextMoveNum}{nextMainline.San}{nextComment} ");
                 
                 // Write variations (siblings of nextMainline)
@@ -1102,9 +1141,12 @@ namespace GameHeatmap
                     sb.Append(") ");
                 }
                 
-                // Now continue from nextMainline (already written above)
-                Console.WriteLine($"  Recursing from nextMainline: {nextMainline.San}");
-                WriteMovesPgn(nextMainline, sb, false, nextMainline);
+                // Now continue from nextMainline's CHILDREN (nextMainline already written above)
+                Console.WriteLine($"  Continuing from nextMainline children: {nextMainline.San}");
+                if (nextMainline.NextMoves.Count > 0)
+                {
+                    WriteMovesPgn(nextMainline, sb, false, nextMainline, true);  // afterVariations = true!
+                }
                 return;
             }
             
@@ -1127,7 +1169,7 @@ namespace GameHeatmap
             WriteMovesPgn(mainline, sb, false, mainline);
         }
         
-        private void WriteVariationPgn(MoveNode node, StringBuilder sb, bool isFirstInVariation = true, MoveNode? previousMove = null)
+        private void WriteVariationPgn(MoveNode node, StringBuilder sb, bool isFirstInVariation = true, MoveNode? previousMove = null, bool afterVariations = false)
         {
             bool moveByWhite = !node.isWhiteTurn;
             
@@ -1148,7 +1190,21 @@ namespace GameHeatmap
             {
                 moveNum = $"{node.MoveNumber}. ";
             }
-            else if (!prevWasWhiteSameNumber)
+            else if (prevWasWhiteSameNumber)
+            {
+                // Black move following white move with same number
+                if (afterVariations)
+                {
+                    // After variations, need "...": "10. O-O-O (vars) 10... Rc8"
+                    moveNum = $"{node.MoveNumber}... ";
+                }
+                else
+                {
+                    // On same line, no move number: "6. Be2 Bg7"
+                    moveNum = "";
+                }
+            }
+            else
             {
                 moveNum = $"{node.MoveNumber}... ";
             }
@@ -1166,6 +1222,8 @@ namespace GameHeatmap
             }
             
             // Write this move
+            if (chkDebugOutput.Checked)
+                File.AppendAllText(@"C:\data\debug.txt", $"VAR: {moveNum}{node.San}\n");
             Console.WriteLine($"    Writing in variation: {moveNum}{node.San}{comment}");
             sb.Append($"{moveNum}{node.San}{comment} ");
             
@@ -1204,9 +1262,12 @@ namespace GameHeatmap
                     sb.Append(") ");
                 }
                 
-                // Now continue from nextMainline (already written above)
-                Console.WriteLine($"    Recursing in variation from nextMainline: {nextMainline.San}");
-                WriteVariationPgn(nextMainline, sb, false, nextMainline);
+                // Now continue from nextMainline's CHILDREN (nextMainline already written above)
+                Console.WriteLine($"    Continuing from nextMainline children in variation: {nextMainline.San}");
+                if (nextMainline.NextMoves.Count > 0)
+                {
+                    WriteVariationPgn(nextMainline, sb, false, nextMainline, true);  // afterVariations = true!
+                }
                 return;
             }
             
