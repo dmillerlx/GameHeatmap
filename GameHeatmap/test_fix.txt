@@ -1,0 +1,11 @@
+Testing if I can write to OpeningBuilderForm.cs
+
+The HasBeenWritten flag has already been added to MoveNode in PgnParser.cs.
+
+Now I need to:
+1. Add ResetWrittenFlags method to OpeningBuilderForm.cs
+2. Call it at the start of GeneratePgn
+3. Check the flag before writing moves
+4. Set the flag after writing moves
+
+This will prevent double-writing moves in a much simpler way than tracking afterVariations.

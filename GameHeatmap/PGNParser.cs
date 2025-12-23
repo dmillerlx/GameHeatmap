@@ -50,6 +50,7 @@ namespace GameHeatmap
         public int MoveNumber { get; set; }
         public string San { get; set; } = null;
         public string SanExtra { get; set; } = null;
+        public bool HasBeenWritten { get; set; } = false;  // Track if this move was already written to PGN
 
         /// <summary>
         /// Optional comment associated with this move
