@@ -48,7 +48,7 @@ Now you need to make these changes to OpeningBuilderForm.cs:
             // CHECK: Skip if already written
             if (mainline.HasBeenWritten)
             {
-                Console.WriteLine($"  SKIPPING already written: {mainline.San}");
+                Debug.WriteLine($"  SKIPPING already written: {mainline.San}");
                 return;
             }
             
@@ -72,7 +72,7 @@ Now you need to make these changes to OpeningBuilderForm.cs:
             // CHECK: Skip if already written
             if (node.HasBeenWritten)
             {
-                Console.WriteLine($"  SKIPPING already written variation: {node.San}");
+                Debug.WriteLine($"  SKIPPING already written variation: {node.San}");
                 return;
             }
 

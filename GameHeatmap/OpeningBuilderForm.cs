@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -898,7 +899,9 @@ namespace GameHeatmap
                     {
                         // White move: "1.e4"
                         if (sb.Length > 0) sb.Append(" ");
-                        sb.Append($"{move.MoveNumber}.{move.San}");
+                        if (!move.HasBeenWritten)
+                            sb.Append($"{move.MoveNumber}.{move.San}");
+                        move.HasBeenWritten = true;
                         
                         // Check if next move is black with same move number
                         if (i + 1 < moves.Count && 
@@ -906,7 +909,9 @@ namespace GameHeatmap
                             moves[i + 1].MoveNumber == move.MoveNumber)
                         {
                             // Add black's response on same line: "1.e4 c5"
-                            sb.Append($" {moves[i + 1].San}");  // NO move number!
+                            if (!moves[i + 1].HasBeenWritten)
+                                sb.Append($" {moves[i + 1].San}");  // NO move number!
+                            moves[i + 1].HasBeenWritten = true;
                             i++; // Skip next move since we already added it
                         }
                     }
@@ -914,7 +919,8 @@ namespace GameHeatmap
                     {
                         // Black move starting new line: "6...Bg7"
                         if (sb.Length > 0) sb.Append(" ");
-                        sb.Append($"{move.MoveNumber}...{move.San}");
+                        if (!move.HasBeenWritten)
+                            sb.Append($"{move.MoveNumber}...{move.San}");
                     }
                 }
                 
@@ -1025,23 +1031,36 @@ namespace GameHeatmap
             sb.AppendLine($"[White \"{(theodorePlaysWhite ? "Theodore" : "Opponent")}\"]");
             sb.AppendLine($"[Black \"{(theodorePlaysWhite ? "Opponent" : "Theodore")}\"]");
             sb.AppendLine();
-            
+
+            // Clear all HasBeenWritten flags
+            ClearWrittenFlags(root);
+
             WriteMovesPgn(root, sb);
             sb.AppendLine(" *");
-            
+
             return sb.ToString();
         }
-        
+
+        private void ClearWrittenFlags(MoveNode node)
+        {
+            if (node == null) return;
+            node.HasBeenWritten = false;
+            foreach (var child in node.NextMoves)
+            {
+                ClearWrittenFlags(child);
+            }
+        }
+
         private void WriteMovesPgn(MoveNode node, StringBuilder sb, bool isFirstMove = true, MoveNode? previousMove = null, bool afterVariations = false)
         {
             if (node.NextMoves.Count == 0)
                 return;
-            
+
             // Get mainline move
             var mainline = node.NextMoves[0];
             bool moveByWhite = !mainline.isWhiteTurn;
-            
-            Console.WriteLine($"WriteMovesPgn: Processing mainline={mainline.San}, moveNum={mainline.MoveNumber}, white={moveByWhite}, children={mainline.NextMoves.Count}");
+
+            Debug.WriteLine($"WriteMovesPgn: Processing mainline={mainline.San}, moveNum={mainline.MoveNumber}, white={moveByWhite}, children={mainline.NextMoves.Count}");
             
             // Determine if we need a move number
             string moveNum = "";
@@ -1101,79 +1120,91 @@ namespace GameHeatmap
             // Write the mainline move
             if (chkDebugOutput.Checked)
                 File.AppendAllText(@"C:\data\debug.txt", $"MAIN: {moveNum}{mainline.San}\n");
-            Console.WriteLine($"  Writing: {moveNum}{mainline.San}{comment}");
-            sb.Append($"{moveNum}{mainline.San}{comment} ");
+            Debug.WriteLine($"  Writing: {moveNum}{mainline.San}{comment}");
+            if (!mainline.HasBeenWritten)
+                sb.Append($"{moveNum}{mainline.San}{comment} ");
+            mainline.HasBeenWritten = true;
             
             // Check if mainline has variations (multiple children)
             if (mainline.NextMoves.Count > 1)
             {
-                Console.WriteLine($"  Mainline has {mainline.NextMoves.Count} children (variations present)");
-                
-                // Write the first child of mainline
+                Debug.WriteLine($"  Mainline has {mainline.NextMoves.Count} children (variations present)");
+
+                // Write the first child of mainline (only if not already written)
                 var nextMainline = mainline.NextMoves[0];
-                bool nextMoveByWhite = !nextMainline.isWhiteTurn;
-                string nextMoveNum = nextMoveByWhite ? $"{nextMainline.MoveNumber}. " : $"{nextMainline.MoveNumber}... ";
-                
-                Console.WriteLine($"  Writing first child: {nextMoveNum}{nextMainline.San}");
-                
-                string nextComment = "";
-                if (!string.IsNullOrEmpty(nextMainline.Comment))
+
+                if (!nextMainline.HasBeenWritten)
                 {
-                    string commentText = nextMainline.Comment.StartsWith("[MAINLINE]") 
-                        ? nextMainline.Comment.Substring(10) 
-                        : nextMainline.Comment;
-                    string filteredComment = FilterComment(commentText);
-                    if (!string.IsNullOrEmpty(filteredComment))
-                        nextComment = $" {{ {filteredComment} }}";
+                    bool nextMoveByWhite = !nextMainline.isWhiteTurn;
+                    string nextMoveNum = nextMoveByWhite ? $"{nextMainline.MoveNumber}. " : $"{nextMainline.MoveNumber}... ";
+
+                    Debug.WriteLine($"  Writing first child: {nextMoveNum}{nextMainline.San}");
+
+                    string nextComment = "";
+                    if (!string.IsNullOrEmpty(nextMainline.Comment))
+                    {
+                        string commentText = nextMainline.Comment.StartsWith("[MAINLINE]")
+                            ? nextMainline.Comment.Substring(10)
+                            : nextMainline.Comment;
+                        string filteredComment = FilterComment(commentText);
+                        if (!string.IsNullOrEmpty(filteredComment))
+                            nextComment = $" {{ {filteredComment} }}";
+                    }
+
+                    if (chkDebugOutput.Checked)
+                        File.AppendAllText(@"C:\data\debug.txt", $"CHILD: {nextMoveNum}{nextMainline.San}\n");
+                    if (!nextMainline.HasBeenWritten)
+                        sb.Append($"{nextMoveNum}{nextMainline.San}{nextComment} ");
+                    nextMainline.HasBeenWritten = true;
                 }
-                
-                if (chkDebugOutput.Checked)
-                    File.AppendAllText(@"C:\data\debug.txt", $"CHILD: {nextMoveNum}{nextMainline.San}\n");
-                sb.Append($"{nextMoveNum}{nextMainline.San}{nextComment} ");
-                
+                else
+                {
+                    Debug.WriteLine($"  Skipping first child (already written): {nextMainline.San}");
+                }
+
                 // Write variations (siblings of nextMainline)
-                Console.WriteLine($"  Writing {mainline.NextMoves.Count - 1} variations");
+                Debug.WriteLine($"  Writing {mainline.NextMoves.Count - 1} variations");
                 for (int i = 1; i < mainline.NextMoves.Count; i++)
                 {
-                    Console.WriteLine($"    Variation {i}: {mainline.NextMoves[i].San}");
+                    Debug.WriteLine($"    Variation {i}: {mainline.NextMoves[i].San}");
                     sb.Append("(");
                     WriteVariationPgn(mainline.NextMoves[i], sb, true, null);
                     sb.Append(") ");
                 }
-                
+
                 // Now continue from nextMainline's CHILDREN (nextMainline already written above)
-                Console.WriteLine($"  Continuing from nextMainline children: {nextMainline.San}");
+                Debug.WriteLine($"  Continuing from nextMainline children: {nextMainline.San}");
                 if (nextMainline.NextMoves.Count > 0)
                 {
                     WriteMovesPgn(nextMainline, sb, false, nextMainline, true);  // afterVariations = true!
                 }
                 return;
             }
-            
+
             // Write variations at parent level (alternatives to mainline itself)
             if (node.NextMoves.Count > 1)
             {
-                Console.WriteLine($"  Node has {node.NextMoves.Count} children - writing parent-level variations");
+                Debug.WriteLine($"  Node has {node.NextMoves.Count} children - writing parent-level variations");
             }
             for (int i = 1; i < node.NextMoves.Count; i++)
             {
                 var variation = node.NextMoves[i];
-                Console.WriteLine($"    Parent variation {i}: {variation.San}");
+                Debug.WriteLine($"    Parent variation {i}: {variation.San}");
                 sb.Append("(");
                 WriteVariationPgn(variation, sb, true, null);
                 sb.Append(") ");
             }
-            
+
             // Normal continuation
-            Console.WriteLine($"  Normal recursion from mainline: {mainline.San}");
+            Debug.WriteLine($"  Normal recursion from mainline: {mainline.San}");
             WriteMovesPgn(mainline, sb, false, mainline);
         }
-        
+
         private void WriteVariationPgn(MoveNode node, StringBuilder sb, bool isFirstInVariation = true, MoveNode? previousMove = null, bool afterVariations = false)
         {
             bool moveByWhite = !node.isWhiteTurn;
             
-            Console.WriteLine($"  WriteVariationPgn: node={node.San}, moveNum={node.MoveNumber}, white={moveByWhite}, children={node.NextMoves.Count}, isFirst={isFirstInVariation}");
+            Debug.WriteLine($"  WriteVariationPgn: node={node.San}, moveNum={node.MoveNumber}, white={moveByWhite}, children={node.NextMoves.Count}, isFirst={isFirstInVariation}");
             
             string moveNum = "";
             
@@ -1224,62 +1255,74 @@ namespace GameHeatmap
             // Write this move
             if (chkDebugOutput.Checked)
                 File.AppendAllText(@"C:\data\debug.txt", $"VAR: {moveNum}{node.San}\n");
-            Console.WriteLine($"    Writing in variation: {moveNum}{node.San}{comment}");
-            sb.Append($"{moveNum}{node.San}{comment} ");
+            Debug.WriteLine($"    Writing in variation: {moveNum}{node.San}{comment}");
+            if (!node.HasBeenWritten)
+                sb.Append($"{moveNum}{node.San}{comment} ");
+            node.HasBeenWritten = true;
             
             // Check if this node has multiple children (variations)
             if (node.NextMoves.Count > 1)
             {
-                Console.WriteLine($"    Node has {node.NextMoves.Count} children in variation");
-                
-                // Write the first child
+                Debug.WriteLine($"    Node has {node.NextMoves.Count} children in variation");
+
+                // Write the first child (only if not already written)
                 var nextMainline = node.NextMoves[0];
-                bool nextMoveByWhite = !nextMainline.isWhiteTurn;
-                string nextMoveNum = nextMoveByWhite ? $"{nextMainline.MoveNumber}. " : $"{nextMainline.MoveNumber}... ";
-                
-                Console.WriteLine($"    Writing first child in variation: {nextMoveNum}{nextMainline.San}");
-                
-                string nextComment = "";
-                if (!string.IsNullOrEmpty(nextMainline.Comment))
+
+                if (!nextMainline.HasBeenWritten)
                 {
-                    string commentText = nextMainline.Comment.StartsWith("[MAINLINE]") 
-                        ? nextMainline.Comment.Substring(10) 
-                        : nextMainline.Comment;
-                    string filteredComment = FilterComment(commentText);
-                    if (!string.IsNullOrEmpty(filteredComment))
-                        nextComment = $" {{ {filteredComment} }}";
+                    bool nextMoveByWhite = !nextMainline.isWhiteTurn;
+                    string nextMoveNum = nextMoveByWhite ? $"{nextMainline.MoveNumber}. " : $"{nextMainline.MoveNumber}... ";
+
+                    Debug.WriteLine($"    Writing first child in variation: {nextMoveNum}{nextMainline.San}");
+
+                    string nextComment = "";
+                    if (!string.IsNullOrEmpty(nextMainline.Comment))
+                    {
+                        string commentText = nextMainline.Comment.StartsWith("[MAINLINE]")
+                            ? nextMainline.Comment.Substring(10)
+                            : nextMainline.Comment;
+                        string filteredComment = FilterComment(commentText);
+                        if (!string.IsNullOrEmpty(filteredComment))
+                            nextComment = $" {{ {filteredComment} }}";
+                    }
+
+                    if (!nextMainline.HasBeenWritten)
+                        sb.Append($"{nextMoveNum}{nextMainline.San}{nextComment} ");
+                    nextMainline.HasBeenWritten = true;
                 }
-                
-                sb.Append($"{nextMoveNum}{nextMainline.San}{nextComment} ");
-                
+                else
+                {
+                    Debug.WriteLine($"    Skipping first child in variation (already written): {nextMainline.San}");
+                }
+
                 // Write variations (siblings of nextMainline)
-                Console.WriteLine($"    Writing {node.NextMoves.Count - 1} sub-variations");
+                Debug.WriteLine($"    Writing {node.NextMoves.Count - 1} sub-variations");
                 for (int i = 1; i < node.NextMoves.Count; i++)
                 {
-                    Console.WriteLine($"      Sub-variation {i}: {node.NextMoves[i].San}");
+                    Debug.WriteLine($"      Sub-variation {i}: {node.NextMoves[i].San}");
                     sb.Append("(");
                     WriteVariationPgn(node.NextMoves[i], sb, true, null);
                     sb.Append(") ");
                 }
-                
+
                 // Now continue from nextMainline's CHILDREN (nextMainline already written above)
-                Console.WriteLine($"    Continuing from nextMainline children in variation: {nextMainline.San}");
+                Debug.WriteLine($"    Continuing from nextMainline children in variation: {nextMainline.San}");
                 if (nextMainline.NextMoves.Count > 0)
                 {
                     WriteVariationPgn(nextMainline, sb, false, nextMainline, true);  // afterVariations = true!
                 }
                 return;
             }
-            
+
             // Continue with mainline (no variations at this level)
             if (node.NextMoves.Count > 0)
             {
-                Console.WriteLine($"    Normal recursion in variation from: {node.San} to {node.NextMoves[0].San}");
+                Debug.WriteLine($"    Normal recursion in variation from: {node.San} to {node.NextMoves[0].San}");
                 WriteVariationPgn(node.NextMoves[0], sb, false, node);
             }
             else
             {
-                Console.WriteLine($"    End of variation at: {node.San}");
+                Debug.WriteLine($"    End of variation at: {node.San}");
             }
         }
         

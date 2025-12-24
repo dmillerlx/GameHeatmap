@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Microsoft.Win32;
 
 namespace GameHeatmap
@@ -17,7 +18,7 @@ namespace GameHeatmap
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error setting string value: {ex.Message}");
+                Debug.WriteLine($"Error setting string value: {ex.Message}");
             }
         }
 
@@ -31,7 +32,7 @@ namespace GameHeatmap
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting string value: {ex.Message}");
+                Debug.WriteLine($"Error getting string value: {ex.Message}");
                 return defaultValue;
             }
         }
@@ -45,7 +46,7 @@ namespace GameHeatmap
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error setting int value: {ex.Message}");
+                Debug.WriteLine($"Error setting int value: {ex.Message}");
             }
         }
 
@@ -59,7 +60,7 @@ namespace GameHeatmap
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting int value: {ex.Message}");
+                Debug.WriteLine($"Error getting int value: {ex.Message}");
                 return defaultValue;
             }
         }
@@ -73,7 +74,7 @@ namespace GameHeatmap
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error setting bool value: {ex.Message}");
+                Debug.WriteLine($"Error setting bool value: {ex.Message}");
             }
         }
 
@@ -87,7 +88,7 @@ namespace GameHeatmap
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting bool value: {ex.Message}");
+                Debug.WriteLine($"Error getting bool value: {ex.Message}");
                 return defaultValue;
             }
         }
