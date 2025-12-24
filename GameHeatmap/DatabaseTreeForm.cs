@@ -23,7 +23,7 @@ namespace GameHeatmap
         {
             this.Text = "Database Move Frequency Tree";
             this.Size = new Size(1000, 700);
-            this.StartPosition = FormStartPosition.CenterParent;
+            this.StartPosition = FormStartPosition.CenterScreen;
 
             // TreeView - ADD FIRST so it fills remaining space
             treeView = new TreeView

@@ -42,8 +42,7 @@
               "RelativeToolTip": "GameHeatmap\\RegistryUtils.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAASAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-23T08:19:24.954Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-23T08:19:24.954Z"
             },
             {
               "$type": "Document",
@@ -55,8 +54,7 @@
               "RelativeToolTip": "GameHeatmap\\DUPLICATE_MOVE_FIX_INSTRUCTIONS.txt",
               "ViewState": "AgIAAEEAAAAAAAAAAADwv1EAAAARAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003109|",
-              "WhenOpened": "2025-12-23T07:39:27.619Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-23T07:39:27.619Z"
             },
             {
               "$type": "Document",
@@ -66,7 +64,7 @@
               "RelativeDocumentMoniker": "GameHeatmap\\OpeningBuilderForm.cs",
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
               "RelativeToolTip": "GameHeatmap\\OpeningBuilderForm.cs",
-              "ViewState": "AgIAAI8DAAAAAAAAAAAAAJ0DAAAQAAAAAAAAAA==",
+              "ViewState": "AgIAAFUAAAAAAAAAAADgv10AAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-12-20T01:12:58.268Z",
               "EditorCaption": ""
@@ -81,8 +79,7 @@
               "RelativeToolTip": "GameHeatmap\\MoveFrequencyTree.cs",
               "ViewState": "AgIAAF8AAAAAAAAAAAAswGcAAAA9AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-19T21:33:55.381Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-19T21:33:55.381Z"
             },
             {
               "$type": "Document",
@@ -93,8 +90,7 @@
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs [Design]",
               "RelativeToolTip": "GameHeatmap\\Form1.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-19T04:23:51.126Z",
-              "EditorCaption": " [Design]"
+              "WhenOpened": "2025-12-19T04:23:51.126Z"
             }
           ]
         }

@@ -21,7 +21,7 @@ namespace GameHeatmap
         {
             this.Text = $"Games with move: {node.San}";
             this.Size = new Size(900, 600);
-            this.StartPosition = FormStartPosition.CenterParent;
+            this.StartPosition = FormStartPosition.CenterScreen;
 
             // DataGridView (ADD FIRST - Fill takes remaining space)
             dgvGames = new DataGridView

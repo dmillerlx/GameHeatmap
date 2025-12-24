@@ -58,6 +58,11 @@ namespace GameHeatmap
         /// </summary>
         public string Comment { get; set; } = string.Empty;
 
+        // Flags to track comment source for proper coloring
+        public bool HasTheodoreComment { get; set; } = false;
+        public bool HasDatabaseComment { get; set; } = false;
+        public bool IsMainlineMove { get; set; } = false;
+
         /// <summary>
         /// Numeric Annotation Glyphs, e.g. $1, $2, ...
         /// </summary>

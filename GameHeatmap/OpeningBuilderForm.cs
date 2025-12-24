@@ -33,50 +33,85 @@ namespace GameHeatmap
         private CheckBox chkIncludeDatabaseAnnotations;
         private CheckBox chkUseShortComments;
         private CheckBox chkDebugOutput;
+        private CheckBox chkExtendMainline;
+        private NumericUpDown numExtendMainlineToMove;
+        private TextBox txtCommentTemplate;
+        private TextBox txtDatabaseCommentTemplate;
+        private NumericUpDown numMaxOpponentsInComments;
         private Label lblTheodoreColor;
-        
+
         // Data
         private MoveFrequencyTree? theodoreTree;
+        private HeatmapBuilder? theodoreHeatmap;  // Store Theodore's heatmap for game metadata
         private MoveFrequencyTree? databaseTree;
         private bool theodorePlaysWhite;
         private PgnGame? mainlineGame;
         private string generatedPgn = "";
         private string lastPgnPath = "";
         private MoveNode? outputRoot = null;  // Store the generated tree
-        
-        public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, MoveFrequencyTree? databaseTree, bool theodorePlaysWhite)
+        private bool isLoadingSettings = false;  // Flag to prevent saving during load
+
+        public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, MoveFrequencyTree? databaseTree, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null)
         {
             this.theodoreTree = theodoreTree;
+            this.theodoreHeatmap = theodoreHeatmap;
             this.databaseTree = databaseTree;
             this.theodorePlaysWhite = theodorePlaysWhite;
-            
+
             InitializeComponent();
             LoadSettings();
             AutoLoadLastPgn();
+
+            // Save settings when form closes
+            this.FormClosing += (s, e) => SaveSettings();
         }
         
         private void LoadSettings()
         {
+            isLoadingSettings = true;  // Set flag to prevent saving during load
+
             // Load saved settings from registry
             numMaxBranches.Value = RegistryUtils.GetInt("OpeningBuilder_MaxBranches", 3);
             numPercentThreshold.Value = RegistryUtils.GetInt("OpeningBuilder_PercentThreshold", 90);
             numMaxDepth.Value = RegistryUtils.GetInt("OpeningBuilder_MaxDepth", 10);
             numStartMove.Value = RegistryUtils.GetInt("OpeningBuilder_StartMove", 4);
+            chkUseTheodoreGames.Checked = RegistryUtils.GetInt("OpeningBuilder_UseTheodoreGames", 1) == 1;
+            chkUseDatabaseGames.Checked = RegistryUtils.GetInt("OpeningBuilder_UseDatabaseGames", 1) == 1;
             chkIncludeTheodoreAnnotations.Checked = RegistryUtils.GetInt("OpeningBuilder_IncludeTheodoreAnnotations", 1) == 1;
             chkIncludeDatabaseAnnotations.Checked = RegistryUtils.GetInt("OpeningBuilder_IncludeDatabaseAnnotations", 1) == 1;
             chkUseShortComments.Checked = RegistryUtils.GetInt("OpeningBuilder_UseShortComments", 0) == 1;
+            chkDebugOutput.Checked = RegistryUtils.GetInt("OpeningBuilder_DebugOutput", 0) == 1;
+            chkExtendMainline.Checked = RegistryUtils.GetInt("OpeningBuilder_ExtendMainline", 0) == 1;
+            numExtendMainlineToMove.Value = RegistryUtils.GetInt("OpeningBuilder_ExtendMainlineToMove", 20);
+            txtCommentTemplate.Text = RegistryUtils.GetString("OpeningBuilder_CommentTemplate", "{opponent} ({date})");
+            txtDatabaseCommentTemplate.Text = RegistryUtils.GetString("OpeningBuilder_DatabaseCommentTemplate", "Database: {count}");
+            numMaxOpponentsInComments.Value = RegistryUtils.GetInt("OpeningBuilder_MaxOpponentsInComments", 3);
+
+            isLoadingSettings = false;  // Clear flag after loading complete
         }
-        
+
         private void SaveSettings()
         {
+            // Don't save if we're currently loading settings
+            if (isLoadingSettings)
+                return;
+
             // Save settings to registry
             RegistryUtils.SetInt("OpeningBuilder_MaxBranches", (int)numMaxBranches.Value);
             RegistryUtils.SetInt("OpeningBuilder_PercentThreshold", (int)numPercentThreshold.Value);
             RegistryUtils.SetInt("OpeningBuilder_MaxDepth", (int)numMaxDepth.Value);
             RegistryUtils.SetInt("OpeningBuilder_StartMove", (int)numStartMove.Value);
+            RegistryUtils.SetInt("OpeningBuilder_UseTheodoreGames", chkUseTheodoreGames.Checked ? 1 : 0);
+            RegistryUtils.SetInt("OpeningBuilder_UseDatabaseGames", chkUseDatabaseGames.Checked ? 1 : 0);
             RegistryUtils.SetInt("OpeningBuilder_IncludeTheodoreAnnotations", chkIncludeTheodoreAnnotations.Checked ? 1 : 0);
             RegistryUtils.SetInt("OpeningBuilder_IncludeDatabaseAnnotations", chkIncludeDatabaseAnnotations.Checked ? 1 : 0);
             RegistryUtils.SetInt("OpeningBuilder_UseShortComments", chkUseShortComments.Checked ? 1 : 0);
+            RegistryUtils.SetInt("OpeningBuilder_DebugOutput", chkDebugOutput.Checked ? 1 : 0);
+            RegistryUtils.SetInt("OpeningBuilder_ExtendMainline", chkExtendMainline.Checked ? 1 : 0);
+            RegistryUtils.SetInt("OpeningBuilder_ExtendMainlineToMove", (int)numExtendMainlineToMove.Value);
+            RegistryUtils.SetString("OpeningBuilder_CommentTemplate", txtCommentTemplate.Text);
+            RegistryUtils.SetString("OpeningBuilder_DatabaseCommentTemplate", txtDatabaseCommentTemplate.Text);
+            RegistryUtils.SetInt("OpeningBuilder_MaxOpponentsInComments", (int)numMaxOpponentsInComments.Value);
         }
         
         private void AutoLoadLastPgn()
@@ -93,7 +128,7 @@ namespace GameHeatmap
         {
             this.Text = "Opening Builder";
             this.Size = new Size(1400, 800);
-            this.StartPosition = FormStartPosition.CenterParent;
+            this.StartPosition = FormStartPosition.CenterScreen;
             
             // Split container for left/right panes
             SplitContainer splitContainer = new SplitContainer
@@ -105,19 +140,10 @@ namespace GameHeatmap
             
             // LEFT PANEL - Mainline Input
             leftPanel = new Panel { Dock = DockStyle.Fill };
-            
-            Label lblLeft = new Label
-            {
-                Text = "MAINLINE (Drag & Drop PGN)",
-                Dock = DockStyle.Top,
-                Height = 30,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(5),
-                BackColor = Color.LightBlue
-            };
-            leftPanel.Controls.Add(lblLeft);
-            
+
+            // Add controls in reverse order (they stack from bottom to top when using Dock.Top)
+
+            // Textbox fills remaining space - add FIRST
             txtMainline = new TextBox
             {
                 Multiline = true,
@@ -129,8 +155,21 @@ namespace GameHeatmap
             txtMainline.DragEnter += TxtMainline_DragEnter;
             txtMainline.DragDrop += TxtMainline_DragDrop;
             leftPanel.Controls.Add(txtMainline);
-            txtMainline.BringToFront();
-            
+
+            // Label - add SECOND (will appear above textbox)
+            Label lblLeft = new Label
+            {
+                Text = "MAINLINE (Drag & Drop PGN)",
+                Dock = DockStyle.Top,
+                Height = 30,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(5),
+                BackColor = Color.LightBlue
+            };
+            leftPanel.Controls.Add(lblLeft);
+
+            // Button panel - add LAST (will appear at the very top)
             Panel leftButtonPanel = new Panel { Dock = DockStyle.Top, Height = 40 };
             btnLoadMainline = new Button
             {
@@ -141,7 +180,6 @@ namespace GameHeatmap
             btnLoadMainline.Click += BtnLoadMainline_Click;
             leftButtonPanel.Controls.Add(btnLoadMainline);
             leftPanel.Controls.Add(leftButtonPanel);
-            leftButtonPanel.BringToFront();
             
             splitContainer.Panel1.Controls.Add(leftPanel);
             
@@ -172,194 +210,155 @@ namespace GameHeatmap
             
             splitContainer.Panel2.Controls.Add(rightPanel);
             
-            // TOP PANEL - Configuration
-            Panel topPanel = new Panel { Dock = DockStyle.Top, Height = 160, Padding = new Padding(10) };
-            
-            // Theodore plays as
+            // TOP PANEL - Configuration (redesigned for better space usage)
+            Panel topPanel = new Panel { Dock = DockStyle.Top, Height = 140, Padding = new Padding(10) };
+
+            // ROW 1: Theodore color + Numeric settings
             lblTheodoreColor = new Label
             {
                 Text = $"Theodore plays: {(theodorePlaysWhite ? "WHITE" : "BLACK")}",
                 Location = new Point(10, 10),
-                Size = new Size(200, 25),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Size = new Size(150, 25),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = theodorePlaysWhite ? Color.White : Color.Black,
                 BackColor = theodorePlaysWhite ? Color.DarkGreen : Color.White,
                 TextAlign = ContentAlignment.MiddleCenter,
                 BorderStyle = BorderStyle.FixedSingle
             };
             topPanel.Controls.Add(lblTheodoreColor);
-            
-            // Max branches
-            Label lblMaxBranches = new Label
-            {
-                Text = "Max Branches:",
-                Location = new Point(220, 12),
-                Size = new Size(100, 20)
-            };
+
+            Label lblMaxBranches = new Label { Text = "Branches:", Location = new Point(170, 12), Size = new Size(65, 20) };
             topPanel.Controls.Add(lblMaxBranches);
-            
-            numMaxBranches = new NumericUpDown
-            {
-                Location = new Point(330, 10),
-                Size = new Size(60, 25),
-                Minimum = 1,
-                Maximum = 10,
-                Value = 3
-            };
+            numMaxBranches = new NumericUpDown { Location = new Point(240, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 10, Value = 3 };
             topPanel.Controls.Add(numMaxBranches);
-            
-            // Percentage threshold
-            Label lblPercent = new Label
-            {
-                Text = "% Threshold:",
-                Location = new Point(400, 12),
-                Size = new Size(100, 20)
-            };
+
+            Label lblPercent = new Label { Text = "%:", Location = new Point(300, 12), Size = new Size(25, 20) };
             topPanel.Controls.Add(lblPercent);
-            
-            numPercentThreshold = new NumericUpDown
-            {
-                Location = new Point(510, 10),
-                Size = new Size(60, 25),
-                Minimum = 50,
-                Maximum = 100,
-                Value = 90
-            };
+            numPercentThreshold = new NumericUpDown { Location = new Point(325, 10), Size = new Size(50, 25), Minimum = 50, Maximum = 100, Value = 90 };
             topPanel.Controls.Add(numPercentThreshold);
-            
-            // Max depth
-            Label lblMaxDepth = new Label
-            {
-                Text = "Max Depth:",
-                Location = new Point(580, 12),
-                Size = new Size(80, 20)
-            };
+
+            Label lblMaxDepth = new Label { Text = "Depth:", Location = new Point(385, 12), Size = new Size(45, 20) };
             topPanel.Controls.Add(lblMaxDepth);
-            
-            numMaxDepth = new NumericUpDown
-            {
-                Location = new Point(665, 10),
-                Size = new Size(60, 25),
-                Minimum = 1,
-                Maximum = 50,
-                Value = 10
-            };
+            numMaxDepth = new NumericUpDown { Location = new Point(430, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 50, Value = 10 };
             topPanel.Controls.Add(numMaxDepth);
-            
-            // Start branching after move
-            Label lblStartMove = new Label
-            {
-                Text = "Start branch after:",
-                Location = new Point(735, 12),
-                Size = new Size(120, 20)
-            };
+
+            Label lblStartMove = new Label { Text = "Start after:", Location = new Point(490, 12), Size = new Size(70, 20) };
             topPanel.Controls.Add(lblStartMove);
-            
-            numStartMove = new NumericUpDown
-            {
-                Location = new Point(860, 10),
-                Size = new Size(60, 25),
-                Minimum = 1,
-                Maximum = 50,
-                Value = 4
-            };
+            numStartMove = new NumericUpDown { Location = new Point(560, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 50, Value = 4 };
             topPanel.Controls.Add(numStartMove);
-            
-            // Checkboxes
-            chkUseTheodoreGames = new CheckBox
-            {
-                Text = "Use Theodore's Games",
-                Location = new Point(10, 45),
-                Size = new Size(200, 25),
-                Checked = theodoreTree != null
-            };
-            topPanel.Controls.Add(chkUseTheodoreGames);
-            
-            chkUseDatabaseGames = new CheckBox
-            {
-                Text = "Use Database Games",
-                Location = new Point(220, 45),
-                Size = new Size(200, 25),
-                Checked = databaseTree != null
-            };
-            topPanel.Controls.Add(chkUseDatabaseGames);
-            
-            chkIncludeTheodoreAnnotations = new CheckBox
-            {
-                Text = "Include Theodore Annotations",
-                Location = new Point(10, 75),
-                Size = new Size(200, 25),
-                Checked = true
-            };
-            chkIncludeTheodoreAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
-            topPanel.Controls.Add(chkIncludeTheodoreAnnotations);
-            
-            chkIncludeDatabaseAnnotations = new CheckBox
-            {
-                Text = "Include Database Annotations",
-                Location = new Point(220, 75),
-                Size = new Size(200, 25),
-                Checked = true
-            };
-            chkIncludeDatabaseAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
-            topPanel.Controls.Add(chkIncludeDatabaseAnnotations);
-            
-            chkUseShortComments = new CheckBox
-            {
-                Text = "Use Short Comments (T/DB)",
-                Location = new Point(430, 75),
-                Size = new Size(200, 25),
-                Checked = false
-            };
-            chkUseShortComments.CheckedChanged += AnnotationCheckbox_CheckedChanged;
-            topPanel.Controls.Add(chkUseShortComments);
-            
-            chkDebugOutput = new CheckBox
-            {
-                Text = "Debug Output (C:\\data\\debug.txt)",
-                Location = new Point(640, 75),
-                Size = new Size(220, 25),
-                Checked = false
-            };
+
+            chkExtendMainline = new CheckBox { Text = "Extend to:", Location = new Point(620, 12), Size = new Size(85, 20) };
+            topPanel.Controls.Add(chkExtendMainline);
+            numExtendMainlineToMove = new NumericUpDown { Location = new Point(705, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 100, Value = 20 };
+            topPanel.Controls.Add(numExtendMainlineToMove);
+
+            chkDebugOutput = new CheckBox { Text = "Debug", Location = new Point(765, 12), Size = new Size(70, 20) };
             topPanel.Controls.Add(chkDebugOutput);
             
-            // Buttons
+            // ROW 2: Data source checkboxes
+            chkUseTheodoreGames = new CheckBox { Text = "Use Theodore Games", Location = new Point(10, 42), Size = new Size(150, 20), Checked = theodoreTree != null };
+            topPanel.Controls.Add(chkUseTheodoreGames);
+
+            chkUseDatabaseGames = new CheckBox { Text = "Use Database", Location = new Point(170, 42), Size = new Size(120, 20), Checked = databaseTree != null };
+            topPanel.Controls.Add(chkUseDatabaseGames);
+
+            chkIncludeTheodoreAnnotations = new CheckBox { Text = "Theodore Annot", Location = new Point(300, 42), Size = new Size(120, 20), Checked = true };
+            chkIncludeTheodoreAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
+            topPanel.Controls.Add(chkIncludeTheodoreAnnotations);
+
+            chkIncludeDatabaseAnnotations = new CheckBox { Text = "Database Annot", Location = new Point(430, 42), Size = new Size(120, 20), Checked = true };
+            chkIncludeDatabaseAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
+            topPanel.Controls.Add(chkIncludeDatabaseAnnotations);
+
+            chkUseShortComments = new CheckBox { Text = "Short (T/DB)", Location = new Point(560, 42), Size = new Size(100, 20), Checked = false };
+            chkUseShortComments.CheckedChanged += AnnotationCheckbox_CheckedChanged;
+            topPanel.Controls.Add(chkUseShortComments);
+
+            // ROW 3: Comment templates and max opponents
+            Label lblCommentTemplate = new Label { Text = "Theodore:", Location = new Point(10, 72), Size = new Size(65, 20) };
+            topPanel.Controls.Add(lblCommentTemplate);
+
+            txtCommentTemplate = new TextBox
+            {
+                Location = new Point(75, 70),
+                Size = new Size(200, 25),
+                Text = "{opponent} ({date})",
+                Font = new Font("Consolas", 9)
+            };
+            topPanel.Controls.Add(txtCommentTemplate);
+
+            Label lblDatabaseTemplate = new Label { Text = "DB:", Location = new Point(285, 72), Size = new Size(30, 20) };
+            topPanel.Controls.Add(lblDatabaseTemplate);
+
+            txtDatabaseCommentTemplate = new TextBox
+            {
+                Location = new Point(315, 70),
+                Size = new Size(160, 25),
+                Text = "Database: {count}",
+                Font = new Font("Consolas", 9)
+            };
+            topPanel.Controls.Add(txtDatabaseCommentTemplate);
+
+            Label lblMaxOpponents = new Label { Text = "Max:", Location = new Point(485, 72), Size = new Size(35, 20) };
+            topPanel.Controls.Add(lblMaxOpponents);
+
+            numMaxOpponentsInComments = new NumericUpDown
+            {
+                Location = new Point(520, 70),
+                Size = new Size(50, 25),
+                Minimum = 1,
+                Maximum = 25,
+                Value = 3
+            };
+            topPanel.Controls.Add(numMaxOpponentsInComments);
+
+            Label lblTemplateHelp = new Label
+            {
+                Text = "Use: {opponent} {date} {event} {count}",
+                Location = new Point(580, 72),
+                Size = new Size(250, 20),
+                ForeColor = Color.Gray,
+                Font = new Font("Segoe UI", 8, FontStyle.Italic)
+            };
+            topPanel.Controls.Add(lblTemplateHelp);
+
+            // ROW 4: Buttons
             btnGenerate = new Button
             {
                 Text = "Generate Opening Tree",
-                Location = new Point(10, 110),
-                Size = new Size(180, 40),
+                Location = new Point(10, 100),
+                Size = new Size(180, 35),
                 BackColor = Color.LightGreen,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
             btnGenerate.Click += BtnGenerate_Click;
             topPanel.Controls.Add(btnGenerate);
-            
+
             btnSave = new Button
             {
                 Text = "Save to PGN",
-                Location = new Point(200, 110),
-                Size = new Size(120, 40),
+                Location = new Point(200, 100),
+                Size = new Size(120, 35),
                 Enabled = false
             };
             btnSave.Click += BtnSave_Click;
             topPanel.Controls.Add(btnSave);
-            
+
             btnCopy = new Button
             {
                 Text = "Copy PGN",
-                Location = new Point(330, 110),
-                Size = new Size(100, 40),
+                Location = new Point(330, 100),
+                Size = new Size(100, 35),
                 Enabled = false
             };
             btnCopy.Click += BtnCopy_Click;
             topPanel.Controls.Add(btnCopy);
-            
+
             btnClear = new Button
             {
                 Text = "Clear",
-                Location = new Point(440, 110),
-                Size = new Size(100, 40)
+                Location = new Point(440, 100),
+                Size = new Size(80, 35)
             };
             btnClear.Click += BtnClear_Click;
             topPanel.Controls.Add(btnClear);
@@ -463,29 +462,36 @@ namespace GameHeatmap
         private void GenerateOpeningTree()
         {
             treeVariations.Nodes.Clear();
-            
+
             // Save settings to registry
             SaveSettings();
-            
+
             int maxBranches = (int)numMaxBranches.Value;
             int percentThreshold = (int)numPercentThreshold.Value;
             int maxDepth = (int)numMaxDepth.Value * 2; // Convert full moves to plies
             int startMove = (int)numStartMove.Value;
-            
+
             // Create output tree by copying mainline
             outputRoot = CopyMoveTree(mainlineGame!.MoveTreeRoot);
-            
+
+            // Extend mainline if requested
+            if (chkExtendMainline.Checked)
+            {
+                int targetMoveNumber = (int)numExtendMainlineToMove.Value;
+                ExtendMainlineToMove(outputRoot, targetMoveNumber);
+            }
+
             // Build variations by traversing the mainline and adding opponent responses
             BuildVariations(outputRoot, 0, maxDepth, maxBranches, percentThreshold, startMove);
-            
+
             // Display in tree view
             DisplayTreeInView(outputRoot);
-            
+
             // Generate PGN
             generatedPgn = GeneratePgn(outputRoot);
             btnSave.Enabled = true;
             btnCopy.Enabled = true;
-            
+
             //MessageBox.Show("Opening tree generated successfully!\n\nExpand the tree to see variations.",
             //    "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -509,6 +515,7 @@ namespace GameHeatmap
                 MoveNumber = source.MoveNumber,
                 San = source.San,
                 Comment = source.Comment,
+                IsMainlineMove = true,  // Mainline moves from copied tree
                 // If it's white to move and this node has a move, the move is by white
                 // After white moves, isWhiteTurn = false (black to move next)
                 // If this is the root dummy node (no San), don't change isWhiteTurn
@@ -527,7 +534,106 @@ namespace GameHeatmap
             
             return copy;
         }
-        
+
+        private void ExtendMainlineToMove(MoveNode root, int targetMoveNumber)
+        {
+            // Find the end of the mainline
+            MoveNode current = root;
+            while (current.NextMoves.Count > 0)
+            {
+                current = current.NextMoves[0]; // Follow the mainline (first child)
+            }
+
+            // Get current move number and depth
+            int currentMoveNumber = current.MoveNumber;
+            if (string.IsNullOrEmpty(current.San))
+            {
+                // This is the root node, start from move 1
+                currentMoveNumber = 0;
+            }
+
+            // If already at or past target, don't truncate
+            if (currentMoveNumber >= targetMoveNumber)
+                return;
+
+            // Calculate depth (ply count from root)
+            int depth = 0;
+            MoveNode temp = current;
+            while (temp.Parent != null)
+            {
+                depth++;
+                temp = temp.Parent;
+            }
+
+            // Extend by following top database moves
+            bool isWhiteToMove = (depth % 2 == 0);
+
+            while (currentMoveNumber < targetMoveNumber)
+            {
+                // Get the move sequence to this point
+                var moveSequence = GetMoveSequence(current);
+
+                // Find top move from database for the current side
+                var movesFromDB = new List<(string san, int frequency)>();
+
+                // Check Theodore's games
+                if (chkUseTheodoreGames.Checked && theodoreTree != null)
+                {
+                    var theodoreMoves = FindMovesInTree(theodoreTree.Root, moveSequence, isWhiteToMove);
+                    movesFromDB.AddRange(theodoreMoves);
+                }
+
+                // Check database
+                if (chkUseDatabaseGames.Checked && databaseTree != null)
+                {
+                    var dbMoves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove);
+                    movesFromDB.AddRange(dbMoves);
+                }
+
+                if (movesFromDB.Count == 0)
+                {
+                    // No more moves in database, stop extending
+                    break;
+                }
+
+                // Get the top move
+                var topMove = movesFromDB
+                    .GroupBy(m => m.san)
+                    .Select(g => (san: g.Key, freq: g.Sum(x => x.frequency)))
+                    .OrderByDescending(m => m.freq)
+                    .First();
+
+                // Calculate move number for the new move
+                int newMoveNumber = isWhiteToMove ? (depth / 2) + 1 : currentMoveNumber;
+
+                // Create new move node
+                var newNode = new MoveNode
+                {
+                    MoveNumber = newMoveNumber,
+                    San = topMove.san,
+                    Comment = $"[MAINLINE] Extended via database (freq: {topMove.freq})",
+                    Parent = current,
+                    isWhiteTurn = !isWhiteToMove
+                };
+
+                current.NextMoves.Add(newNode);
+                current = newNode;
+                depth++;
+                isWhiteToMove = !isWhiteToMove;
+
+                // Update current move number
+                if (isWhiteToMove)
+                {
+                    // Just finished black's move, move number stays same
+                }
+                else
+                {
+                    // Just finished white's move, increment
+                    currentMoveNumber++;
+                }
+            }
+        }
+
         private void BuildVariations(MoveNode node, int depth, int maxDepth, int maxBranches, int percentThreshold, int startMove)
         {
             // Stop at max depth
@@ -585,21 +691,27 @@ namespace GameHeatmap
                         var bestMove = combinedMoves
                             .OrderByDescending(m => m.Value.theoFreq + m.Value.dbFreq)
                             .First();
-                        
-                        // Build source string showing both frequencies separately
-                        string source = BuildSourceString(bestMove.Value.theoFreq, bestMove.Value.dbFreq);
-                        
+
+                        // Build comment using helper method that respects annotation checkboxes
+                        var (comment, hasTheodore, hasDatabase) = BuildCombinedComment(
+                            bestMove.Value.theoFreq,
+                            bestMove.Value.dbFreq,
+                            moveSequence,
+                            bestMove.Key);
+
                         int moveNum = (depth / 2) + 1;
-                        
+
                         var bestMoveNode = new MoveNode
                         {
                             MoveNumber = moveNum,
                             San = bestMove.Key,
-                            Comment = source,  // Use the properly formatted source string
+                            Comment = comment,
+                            HasTheodoreComment = hasTheodore,
+                            HasDatabaseComment = hasDatabase,
                             Parent = node,
                             isWhiteTurn = !isWhiteToMoveNow
                         };
-                        
+
                         node.NextMoves.Add(bestMoveNode);
                         BuildVariations(bestMoveNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
                         return;
@@ -611,49 +723,83 @@ namespace GameHeatmap
                     int moveNum = (depth / 2) + 1;
                     if (moveNum > startMove)  // Start branching AFTER this move number
                     {
+                        // Separate Theodore and Database moves
+                        var theodoreMoves = new Dictionary<string, int>();
+                        var databaseMoves = new Dictionary<string, int>();
+
                         // Check Theodore's games
                         if (chkUseTheodoreGames.Checked && theodoreTree != null)
                         {
-                            var theodoreMoves = FindMovesInTree(theodoreTree.Root, moveSequence, isWhiteToMoveNow);
-                            movesFromDB.AddRange(theodoreMoves);
+                            var moves = FindMovesInTree(theodoreTree.Root, moveSequence, isWhiteToMoveNow);
+                            foreach (var (san, freq) in moves)
+                            {
+                                theodoreMoves[san] = freq;
+                            }
                         }
-                        
+
                         // Check database
                         if (chkUseDatabaseGames.Checked && databaseTree != null)
                         {
-                            var dbMoves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow);
-                            movesFromDB.AddRange(dbMoves);
+                            var moves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow);
+                            foreach (var (san, freq) in moves)
+                            {
+                                databaseMoves[san] = freq;
+                            }
                         }
-                        
-                        if (movesFromDB.Count > 0)
+
+                        // Combine and sort
+                        var allMoves = new Dictionary<string, (int theoFreq, int dbFreq)>();
+
+                        foreach (var kvp in theodoreMoves)
                         {
-                            // Get top moves up to maxBranches and threshold
-                            var sortedMoves = movesFromDB
-                                .GroupBy(m => m.san)
-                                .Select(g => (san: g.Key, freq: g.Sum(x => x.frequency)))
-                                .OrderByDescending(m => m.freq)
+                            allMoves[kvp.Key] = (kvp.Value, databaseMoves.GetValueOrDefault(kvp.Key, 0));
+                        }
+
+                        foreach (var kvp in databaseMoves)
+                        {
+                            if (!allMoves.ContainsKey(kvp.Key))
+                            {
+                                allMoves[kvp.Key] = (0, kvp.Value);
+                            }
+                        }
+
+                        if (allMoves.Count > 0)
+                        {
+                            // Sort by total frequency
+                            var sortedMoves = allMoves
+                                .Select(kvp => (san: kvp.Key, theoFreq: kvp.Value.theoFreq, dbFreq: kvp.Value.dbFreq, totalFreq: kvp.Value.theoFreq + kvp.Value.dbFreq))
+                                .OrderByDescending(m => m.totalFreq)
                                 .ToList();
-                            
-                            int totalGames = sortedMoves.Sum(m => m.freq);
+
+                            int totalGames = sortedMoves.Sum(m => m.totalFreq);
                             int cumulativeGames = 0;
-                            
+
                             foreach (var move in sortedMoves)
                             {
-                                cumulativeGames += move.freq;
+                                cumulativeGames += move.totalFreq;
                                 double percentage = (cumulativeGames * 100.0) / totalGames;
-                                
+
+                                // Build comment using helper method that respects annotation checkboxes
+                                var (comment, hasTheodore, hasDatabase) = BuildCombinedComment(
+                                    move.theoFreq,
+                                    move.dbFreq,
+                                    moveSequence,
+                                    move.san);
+
                                 var variationNode = new MoveNode
                                 {
                                     MoveNumber = moveNum,
                                     San = move.san,
-                                    Comment = $"Database: {move.freq} games",
+                                    Comment = comment,
+                                    HasTheodoreComment = hasTheodore,
+                                    HasDatabaseComment = hasDatabase,
                                     Parent = node,
                                     isWhiteTurn = !isWhiteToMoveNow
                                 };
-                                
+
                                 node.NextMoves.Add(variationNode);
                                 BuildVariations(variationNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
-                                
+
                                 if (node.NextMoves.Count >= maxBranches || percentage >= percentThreshold)
                                     break;
                             }
@@ -697,7 +843,7 @@ namespace GameHeatmap
                 }
                 
                 // Add variations (excluding mainline)
-                foreach (var (san, source, frequency) in alternativeMoves)
+                foreach (var (san, source, frequency, hasTheodore, hasDatabase) in alternativeMoves)
                 {
                     if (san != mainlineMove.San)
                     {
@@ -705,13 +851,15 @@ namespace GameHeatmap
                         {
                             MoveNumber = mainlineMove.MoveNumber,
                             San = san,
-                            Comment = $"{source}: {frequency} games",
+                            Comment = source,
+                            HasTheodoreComment = hasTheodore,
+                            HasDatabaseComment = hasDatabase,
                             Parent = node,
                             isWhiteTurn = !isWhiteToMove
                         };
-                        
+
                         node.NextMoves.Add(variationNode);
-                        
+
                         // Continue building this variation recursively
                         if (depth + 1 < maxDepth)
                         {
@@ -719,17 +867,20 @@ namespace GameHeatmap
                         }
                     }
                 }
-                
-                // Annotate mainline with database frequencies (but don't add as comment to keep it black/bold)
-                // Instead, we'll track this separately and add it during PGN generation
+
+                // Annotate mainline with database frequencies if annotations are enabled
                 if (alternativeMoves.Count > 0)
                 {
                     var mainlineInfo = alternativeMoves.FirstOrDefault(m => m.san == mainlineMove.San);
                     if (mainlineInfo != default)
                     {
-                        // Store annotation in a special marker that won't affect display color
-                        if (string.IsNullOrEmpty(mainlineMove.Comment))
-                            mainlineMove.Comment = $"[MAINLINE]{mainlineInfo.source}: {mainlineInfo.frequency} games";
+                        // Store annotation with proper flags
+                        if (!string.IsNullOrEmpty(mainlineInfo.source))
+                        {
+                            mainlineMove.Comment = $"[MAINLINE]{mainlineInfo.source}";
+                            mainlineMove.HasTheodoreComment = mainlineInfo.hasTheodore;
+                            mainlineMove.HasDatabaseComment = mainlineInfo.hasDatabase;
+                        }
                     }
                 }
             }
@@ -739,14 +890,14 @@ namespace GameHeatmap
         }
 
         
-        private List<(string san, string source, int frequency)> FindOpponentMoves(
+        private List<(string san, string source, int frequency, bool hasTheodore, bool hasDatabase)> FindOpponentMoves(
             MoveNode currentPosition, string mainlineSan, int maxBranches, int percentThreshold, bool isWhiteToMove)
         {
             // Separate Theodore and Database moves
             var theodoreMoves = new Dictionary<string, int>();
             var databaseMoves = new Dictionary<string, int>();
             var moveSequence = GetMoveSequence(currentPosition);
-            
+
             // Get Theodore's moves
             if (chkUseTheodoreGames.Checked && theodoreTree != null)
             {
@@ -756,72 +907,226 @@ namespace GameHeatmap
                     theodoreMoves[san] = freq;
                 }
             }
-            
+
             // Get Database moves - apply maxBranches and threshold here
             if (chkUseDatabaseGames.Checked && databaseTree != null)
             {
                 var moves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove);
                 var sortedDbMoves = moves.OrderByDescending(m => m.frequency).ToList();
-                
+
                 if (sortedDbMoves.Count > 0)
                 {
                     int totalGames = sortedDbMoves.Sum(m => m.frequency);
                     int cumulativeGames = 0;
                     int branchCount = 0;
-                    
+
                     foreach (var (san, freq) in sortedDbMoves)
                     {
                         cumulativeGames += freq;
                         double percentage = (cumulativeGames * 100.0) / totalGames;
-                        
+
                         databaseMoves[san] = freq;
                         branchCount++;
-                        
+
                         // Stop after maxBranches or percentThreshold
                         if (branchCount >= maxBranches || percentage >= percentThreshold)
                             break;
                     }
                 }
             }
-            
+
             // Combine results - ALL Theodore moves + limited Database moves
-            var result = new List<(string san, string source, int frequency)>();
-            var allMoves = new Dictionary<string, (int theoFreq, int dbFreq)>();
-            
+            var result = new List<(string san, string source, int frequency, bool hasTheodore, bool hasDatabase)>();
+            var allMoves = new Dictionary<string, (int theoFreq, int dbFreq, string san)>();
+
             foreach (var kvp in theodoreMoves)
             {
-                allMoves[kvp.Key] = (kvp.Value, databaseMoves.GetValueOrDefault(kvp.Key, 0));
+                allMoves[kvp.Key] = (kvp.Value, databaseMoves.GetValueOrDefault(kvp.Key, 0), kvp.Key);
             }
-            
+
             foreach (var kvp in databaseMoves)
             {
                 if (!allMoves.ContainsKey(kvp.Key))
                 {
-                    allMoves[kvp.Key] = (0, kvp.Value);
+                    allMoves[kvp.Key] = (0, kvp.Value, kvp.Key);
                 }
             }
-            
+
             // Sort by total frequency
             var sortedMoves = allMoves.OrderByDescending(m => m.Value.theoFreq + m.Value.dbFreq).ToList();
-            
+
             foreach (var move in sortedMoves)
             {
-                string source = BuildSourceString(move.Value.theoFreq, move.Value.dbFreq);
-                int totalFreq = move.Value.theoFreq + move.Value.dbFreq;
-                result.Add((move.Key, source, totalFreq));
+                int theoFreq = move.Value.theoFreq;
+                int dbFreq = move.Value.dbFreq;
+
+                // Build comment using helper method that respects annotation checkboxes
+                var (comment, hasTheodore, hasDatabase) = BuildCombinedComment(
+                    theoFreq,
+                    dbFreq,
+                    moveSequence,
+                    move.Value.san);
+
+                int totalFreq = theoFreq + dbFreq;
+                result.Add((move.Key, comment, totalFreq, hasTheodore, hasDatabase));
             }
-            
+
             return result;
         }
         
         private string BuildSourceString(int theoFreq, int dbFreq)
         {
+            // Fallback method when heatmap is not available
             if (theoFreq > 0 && dbFreq > 0)
-                return $"Theodore: {theoFreq}, Database: {dbFreq}";
+            {
+                string dbComment = BuildDatabaseCommentWithTemplate(dbFreq);
+                return $"Theodore: {theoFreq}, {dbComment}";
+            }
             else if (theoFreq > 0)
                 return $"Theodore: {theoFreq}";
             else
-                return $"Database: {dbFreq}";
+                return BuildDatabaseCommentWithTemplate(dbFreq);
+        }
+
+        /// <summary>
+        /// Get games from Theodore's heatmap for a specific move sequence
+        /// </summary>
+        private List<PgnGame>? GetTheodoreGamesForMoveSequence(List<string> moveSequence)
+        {
+            if (theodoreHeatmap == null)
+                return null;
+
+            var currentNode = theodoreHeatmap.Root;
+
+            // Navigate through the move sequence
+            foreach (var moveSan in moveSequence)
+            {
+                var childNode = currentNode.Children.FirstOrDefault(c => c.San == moveSan);
+                if (childNode == null)
+                    return null;
+                currentNode = childNode;
+            }
+
+            return currentNode.Games;
+        }
+
+        /// <summary>
+        /// Format game metadata using the user's template
+        /// </summary>
+        private string FormatGameWithTemplate(PgnGame game, string template)
+        {
+            string result = template;
+
+            // Get opponent name
+            string opponent = "Unknown";
+            if (game.Tags.ContainsKey("White") && game.Tags.ContainsKey("Black"))
+            {
+                // Theodore is white, so opponent is black
+                opponent = theodorePlaysWhite ? game.Tags["Black"] : game.Tags["White"];
+            }
+
+            // Get date
+            string date = game.Tags.ContainsKey("Date") ? game.Tags["Date"] : "";
+
+            // Get event
+            string eventName = game.Tags.ContainsKey("Event") ? game.Tags["Event"] : "";
+
+            // Replace tokens
+            result = result.Replace("{opponent}", opponent);
+            result = result.Replace("{date}", date);
+            result = result.Replace("{event}", eventName);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Build a comment string for database moves using the template
+        /// </summary>
+        private string BuildDatabaseCommentWithTemplate(int count)
+        {
+            string template = txtDatabaseCommentTemplate.Text;
+            return template.Replace("{count}", count.ToString());
+        }
+
+        /// <summary>
+        /// Build a complete comment combining Theodore and Database parts, respecting annotation checkboxes
+        /// </summary>
+        private (string comment, bool hasTheodore, bool hasDatabase) BuildCombinedComment(
+            int theoFreq, int dbFreq, List<string> moveSequence, string moveSan)
+        {
+            string theodoreComment = "";
+            string databaseComment = "";
+            bool hasTheodore = false;
+            bool hasDatabase = false;
+
+            // Build Theodore comment if applicable
+            if (theoFreq > 0 && chkIncludeTheodoreAnnotations.Checked)
+            {
+                if (theodoreHeatmap != null)
+                {
+                    var moveSeqWithMove = new List<string>(moveSequence);
+                    moveSeqWithMove.Add(moveSan);
+                    theodoreComment = BuildTheodoreCommentWithTemplate(moveSeqWithMove);
+                    if (!string.IsNullOrEmpty(theodoreComment))
+                        hasTheodore = true;
+                }
+            }
+
+            // Build Database comment if applicable
+            if (dbFreq > 0 && chkIncludeDatabaseAnnotations.Checked)
+            {
+                databaseComment = BuildDatabaseCommentWithTemplate(dbFreq);
+                hasDatabase = true;
+            }
+
+            // Combine comments
+            string finalComment = "";
+            if (hasTheodore && hasDatabase)
+                finalComment = $"{theodoreComment}, {databaseComment}";
+            else if (hasTheodore)
+                finalComment = theodoreComment;
+            else if (hasDatabase)
+                finalComment = databaseComment;
+
+            return (finalComment, hasTheodore, hasDatabase);
+        }
+
+        /// <summary>
+        /// Build a comment string for Theodore's moves using the template
+        /// </summary>
+        private string BuildTheodoreCommentWithTemplate(List<string> moveSequence)
+        {
+            // Get games from heatmap
+            var games = GetTheodoreGamesForMoveSequence(moveSequence);
+            if (games == null || games.Count == 0)
+                return "";  // Return empty if no games
+
+            // Get template and max opponents
+            string template = txtCommentTemplate.Text;
+            int maxOpponents = (int)numMaxOpponentsInComments.Value;
+
+            // Sort games by date (most recent first) if date is available
+            var sortedGames = games
+                .OrderByDescending(g => g.Tags.ContainsKey("Date") ? g.Tags["Date"] : "")
+                .Take(maxOpponents)
+                .ToList();
+
+            // Format each game using template
+            var formattedGames = sortedGames
+                .Select(g => FormatGameWithTemplate(g, template))
+                .ToList();
+
+            // Combine into a single comment
+            if (formattedGames.Count == 0)
+                return "";
+
+            string comment = string.Join(", ", formattedGames);
+
+            // If we truncated, add count
+            if (games.Count > maxOpponents)
+                comment += $" + {games.Count - maxOpponents} more";
+
+            return comment;  // No "Theodore:" prefix
         }
         
         private List<string> GetMoveSequence(MoveNode node)
@@ -939,23 +1244,23 @@ namespace GameHeatmap
                 }
                 else
                 {
-                    // At least one move has a comment - use first comment for color
-                    var commentedMove = moves.FirstOrDefault(m => !string.IsNullOrEmpty(m.Comment));
+                    // Use flags to determine color
+                    var commentedMove = moves.FirstOrDefault(m => m.HasTheodoreComment || m.HasDatabaseComment || m.IsMainlineMove);
                     if (commentedMove != null)
                     {
-                        if (commentedMove.Comment.Contains("Theodore:") && commentedMove.Comment.Contains("Database:"))
+                        if (commentedMove.HasTheodoreComment && commentedMove.HasDatabaseComment)
                         {
-                            treeNode.ForeColor = Color.Purple;
+                            treeNode.ForeColor = Color.Purple;  // Both sources
                         }
-                        else if (commentedMove.Comment.Contains("Theodore:"))
+                        else if (commentedMove.HasTheodoreComment)
                         {
-                            treeNode.ForeColor = Color.DarkRed;
+                            treeNode.ForeColor = Color.DarkRed;  // Theodore only
                         }
-                        else if (commentedMove.Comment.Contains("Database:"))
+                        else if (commentedMove.HasDatabaseComment)
                         {
-                            treeNode.ForeColor = Color.DarkGreen;
+                            treeNode.ForeColor = Color.DarkGreen;  // Database only
                         }
-                        else
+                        else if (commentedMove.IsMainlineMove)
                         {
                             treeNode.ForeColor = Color.Black;
                             treeNode.NodeFont = new Font(treeVariations.Font, FontStyle.Bold);
@@ -996,16 +1301,16 @@ namespace GameHeatmap
                 }
                 else
                 {
-                    // Variations - color by source
-                    if (child.Comment.Contains("Theodore:") && child.Comment.Contains("Database:"))
+                    // Variations - color by flags
+                    if (child.HasTheodoreComment && child.HasDatabaseComment)
                     {
-                        treeNode.ForeColor = Color.Purple;  // Both databases
+                        treeNode.ForeColor = Color.Purple;  // Both sources
                     }
-                    else if (child.Comment.Contains("Theodore:"))
+                    else if (child.HasTheodoreComment)
                     {
-                        treeNode.ForeColor = Color.DarkRed;  // Theodore's games only
+                        treeNode.ForeColor = Color.DarkRed;  // Theodore only
                     }
-                    else if (child.Comment.Contains("Database:"))
+                    else if (child.HasDatabaseComment)
                     {
                         treeNode.ForeColor = Color.DarkGreen;  // Database only
                     }

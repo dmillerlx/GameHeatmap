@@ -1691,8 +1691,8 @@ namespace GameHeatmap
                 theodoreTree = ConvertHeatmapToFrequencyTree(heatmapBuilder);
             }
 
-            // Open the Opening Builder form
-            var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked);
+            // Open the Opening Builder form - pass both the frequency tree and the heatmap
+            var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder);
             builderForm.ShowDialog(this);
         }
 
