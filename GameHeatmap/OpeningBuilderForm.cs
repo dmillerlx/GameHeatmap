@@ -1124,7 +1124,10 @@ namespace GameHeatmap
 
             // If we truncated, add count
             if (games.Count > maxOpponents)
-                comment += $" + {games.Count - maxOpponents} more";
+            {
+                int remaining = games.Count - maxOpponents;
+                comment += $", and {remaining} more {(remaining == 1 ? "game" : "games")}";
+            }
 
             return comment;  // No "Theodore:" prefix
         }
