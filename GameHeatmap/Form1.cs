@@ -37,6 +37,7 @@ namespace GameHeatmap
         private Button btnLoadCachedDatabase = null!;
 
         private Dictionary<TreeNode, HeatmapNode> nodeToHeatmap = new Dictionary<TreeNode, HeatmapNode>();
+        private float dpiScale = 1.0f;
 
         public Form1()
         {
@@ -47,8 +48,14 @@ namespace GameHeatmap
 
         private void InitializeCustomComponents()
         {
+            // Get DPI scaling factor
+            using (Graphics g = this.CreateGraphics())
+            {
+                dpiScale = g.DpiX / 96f; // 96 DPI is 100% scaling
+            }
+
             this.Text = "Chess Game Heatmap - Theodore's Games";
-            this.Size = new Size(1200, 800);
+            this.Size = new Size(Scale(1200), Scale(800));
             this.AllowDrop = true;
 
             toolTip = new ToolTip();
@@ -59,46 +66,46 @@ namespace GameHeatmap
             Panel leftPanel = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 320,
-                Padding = new Padding(10)
+                Width = Scale(320),
+                Padding = new Padding(Scale(10))
             };
 
-            int yPos = 10;
+            int yPos = Scale(10);
 
             // Player filter
             Label lblPlayerFilterLabel = new Label
             {
                 Text = "Player Filter (comma-separated):",
-                Location = new Point(10, yPos),
-                Size = new Size(300, 20)
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(20))
             };
             leftPanel.Controls.Add(lblPlayerFilterLabel);
-            yPos += 25;
+            yPos += Scale(25);
 
             txtPlayerFilter = new TextBox
             {
-                Location = new Point(10, yPos),
-                Size = new Size(300, 25),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(25)),
                 PlaceholderText = "Theodore, !bot (use ! to exclude)"
             };
             leftPanel.Controls.Add(txtPlayerFilter);
-            yPos += 35;
+            yPos += Scale(35);
 
             // Color selection
             Label lblColorLabel = new Label
             {
                 Text = "Theodore plays as:",
-                Location = new Point(10, yPos),
-                Size = new Size(300, 20)
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(20))
             };
             leftPanel.Controls.Add(lblColorLabel);
-            yPos += 25;
+            yPos += Scale(25);
 
             rbWhite = new RadioButton
             {
                 Text = "White",
-                Location = new Point(10, yPos),
-                Size = new Size(100, 25),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(100), Scale(25)),
                 Checked = true
             };
             leftPanel.Controls.Add(rbWhite);
@@ -106,61 +113,61 @@ namespace GameHeatmap
             rbBlack = new RadioButton
             {
                 Text = "Black",
-                Location = new Point(120, yPos),
-                Size = new Size(100, 25)
+                Location = new Point(Scale(120), yPos),
+                Size = new Size(Scale(100), Scale(25))
             };
             leftPanel.Controls.Add(rbBlack);
-            yPos += 35;
+            yPos += Scale(35);
 
             // Depth filter
             lblDepth = new Label
             {
                 Text = "Max Depth (moves):",
-                Location = new Point(10, yPos),
-                Size = new Size(150, 20)
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(150), Scale(20))
             };
             leftPanel.Controls.Add(lblDepth);
 
             numDepth = new NumericUpDown
             {
-                Location = new Point(170, yPos - 2),
-                Size = new Size(140, 25),
+                Location = new Point(Scale(170), yPos - Scale(2)),
+                Size = new Size(Scale(140), Scale(25)),
                 Minimum = 1,
                 Maximum = 200,
                 Value = 50
             };
             leftPanel.Controls.Add(numDepth);
-            yPos += 35;
+            yPos += Scale(35);
 
             // Apply filter button
             btnApplyFilter = new Button
             {
                 Text = "Apply Filter",
-                Location = new Point(10, yPos),
-                Size = new Size(300, 35),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(35)),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
             btnApplyFilter.Click += BtnApplyFilter_Click;
             leftPanel.Controls.Add(btnApplyFilter);
-            yPos += 45;
+            yPos += Scale(45);
 
             // Load files button
             btnLoadFiles = new Button
             {
                 Text = "Load PGN Files",
-                Location = new Point(10, yPos),
-                Size = new Size(300, 30)
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(30))
             };
             btnLoadFiles.Click += BtnLoadFiles_Click;
             leftPanel.Controls.Add(btnLoadFiles);
-            yPos += 35;
+            yPos += Scale(35);
 
             // Database buttons
             btnLoadDatabase = new Button
             {
                 Text = "Load Database",
-                Location = new Point(10, yPos),
-                Size = new Size(145, 30),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(145), Scale(30)),
                 BackColor = Color.LightYellow
             };
             btnLoadDatabase.Click += BtnLoadDatabase_Click;
@@ -169,21 +176,21 @@ namespace GameHeatmap
             btnViewDatabase = new Button
             {
                 Text = "View Database",
-                Location = new Point(165, yPos),
-                Size = new Size(145, 30),
+                Location = new Point(Scale(165), yPos),
+                Size = new Size(Scale(145), Scale(30)),
                 BackColor = Color.LightGreen,
                 Enabled = false
             };
             btnViewDatabase.Click += BtnViewDatabase_Click;
             leftPanel.Controls.Add(btnViewDatabase);
-            yPos += 35;
+            yPos += Scale(35);
 
             // Save/Load cache buttons
             btnSaveDatabase = new Button
             {
                 Text = "Save Cache",
-                Location = new Point(10, yPos),
-                Size = new Size(145, 30),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(145), Scale(30)),
                 BackColor = Color.LightCyan,
                 Enabled = false
             };
@@ -193,41 +200,41 @@ namespace GameHeatmap
             btnLoadCachedDatabase = new Button
             {
                 Text = "Load Cache",
-                Location = new Point(165, yPos),
-                Size = new Size(145, 30),
+                Location = new Point(Scale(165), yPos),
+                Size = new Size(Scale(145), Scale(30)),
                 BackColor = Color.LightSalmon
             };
             btnLoadCachedDatabase.Click += BtnLoadCachedDatabase_Click;
             leftPanel.Controls.Add(btnLoadCachedDatabase);
-            yPos += 40;
+            yPos += Scale(40);
 
             // Opening Builder button
             Button btnOpeningBuilder = new Button
             {
                 Text = "Opening Builder",
-                Location = new Point(10, yPos),
-                Size = new Size(300, 35),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(35)),
                 BackColor = Color.LightGoldenrodYellow,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
             btnOpeningBuilder.Click += BtnOpeningBuilder_Click;
             leftPanel.Controls.Add(btnOpeningBuilder);
-            yPos += 40;
+            yPos += Scale(40);
 
             // Games list
             Label lblGamesLabel = new Label
             {
                 Text = "Loaded Games (multi-select):",
-                Location = new Point(10, yPos),
-                Size = new Size(300, 20)
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(20))
             };
             leftPanel.Controls.Add(lblGamesLabel);
-            yPos += 25;
+            yPos += Scale(25);
 
             lstGames = new ListBox
             {
-                Location = new Point(10, yPos),
-                Size = new Size(300, 400),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(400)),
                 SelectionMode = SelectionMode.MultiExtended,
                 Font = new Font("Consolas", 8),
                 IntegralHeight = false
@@ -235,13 +242,13 @@ namespace GameHeatmap
             lstGames.SelectedIndexChanged += LstGames_SelectedIndexChanged;
             lstGames.KeyDown += LstGames_KeyDown;
             leftPanel.Controls.Add(lstGames);
-            yPos += 410;
+            yPos += Scale(410);
 
             // Status label
             lblStatus = new Label
             {
-                Location = new Point(10, yPos),
-                Size = new Size(300, 60),
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(60)),
                 Text = "No games loaded"
             };
             leftPanel.Controls.Add(lblStatus);
@@ -271,16 +278,16 @@ namespace GameHeatmap
             Panel treeControlPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 80,
-                Padding = new Padding(5)
+                Height = Scale(80),
+                Padding = new Padding(Scale(5))
             };
 
             // Stats label
             lblStats = new Label
             {
                 Text = "Tree View",
-                Location = new Point(5, 5),
-                Size = new Size(800, 25),
+                Location = new Point(Scale(5), Scale(5)),
+                Size = new Size(Scale(800), Scale(25)),
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -291,8 +298,8 @@ namespace GameHeatmap
             Label lblLegend = new Label
             {
                 Text = "Colors: Bold Red (80%+) | Dark Red (50-79%) | Orange (20-49%) | Gray (<20%)  |  Format: Move (games/total = %)",
-                Location = new Point(5, 33),
-                Size = new Size(800, 20),
+                Location = new Point(Scale(5), Scale(33)),
+                Size = new Size(Scale(800), Scale(20)),
                 Font = new Font("Segoe UI", 9),
                 ForeColor = Color.DarkSlateGray,
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -304,8 +311,8 @@ namespace GameHeatmap
             Button btnExpandAll = new Button
             {
                 Text = "Expand All",
-                Location = new Point(5, 55),
-                Size = new Size(100, 25)
+                Location = new Point(Scale(5), Scale(55)),
+                Size = new Size(Scale(100), Scale(25))
             };
             btnExpandAll.Click += (s, e) => treeView.ExpandAll();
             treeControlPanel.Controls.Add(btnExpandAll);
@@ -313,8 +320,8 @@ namespace GameHeatmap
             Button btnCollapseAll = new Button
             {
                 Text = "Collapse All",
-                Location = new Point(115, 55),
-                Size = new Size(100, 25)
+                Location = new Point(Scale(115), Scale(55)),
+                Size = new Size(Scale(100), Scale(25))
             };
             btnCollapseAll.Click += (s, e) => treeView.CollapseAll();
             treeControlPanel.Controls.Add(btnCollapseAll);
@@ -323,8 +330,8 @@ namespace GameHeatmap
             chkShowTooltips = new CheckBox
             {
                 Text = "Show Tooltips",
-                Location = new Point(225, 57),
-                Size = new Size(120, 25),
+                Location = new Point(Scale(225), Scale(57)),
+                Size = new Size(Scale(120), Scale(25)),
                 Checked = true
             };
             chkShowTooltips.CheckedChanged += (s, e) => { showTooltips = chkShowTooltips.Checked; };
@@ -339,7 +346,7 @@ namespace GameHeatmap
             Splitter splitter = new Splitter
             {
                 Dock = DockStyle.Left,
-                Width = 5,
+                Width = Scale(5),
                 BackColor = Color.DarkGray
             };
             this.Controls.Add(splitter);
@@ -401,7 +408,7 @@ namespace GameHeatmap
             using (var progressForm = new Form())
             {
                 progressForm.Text = "Loading Database Cache (Startup)";
-                progressForm.Size = new Size(500, 260);
+                progressForm.Size = new Size(Scale(500), Scale(260));
                 progressForm.StartPosition = FormStartPosition.CenterScreen;
                 progressForm.FormBorderStyle = FormBorderStyle.FixedDialog;
                 progressForm.MaximizeBox = false;
@@ -411,8 +418,8 @@ namespace GameHeatmap
                 Label lblTitle = new Label
                 {
                     Text = $"Loading cache: {Path.GetFileName(filePath)}...",
-                    Location = new Point(30, 25),
-                    Size = new Size(440, 25),
+                    Location = new Point(Scale(30), Scale(25)),
+                    Size = new Size(Scale(440), Scale(25)),
                     Font = new Font("Segoe UI", 11, FontStyle.Bold),
                     TextAlign = ContentAlignment.MiddleLeft
                 };
@@ -421,8 +428,8 @@ namespace GameHeatmap
                 Label lblStatus = new Label
                 {
                     Text = "This may take a minute for large databases.",
-                    Location = new Point(30, 55),
-                    Size = new Size(440, 25),
+                    Location = new Point(Scale(30), Scale(55)),
+                    Size = new Size(Scale(440), Scale(25)),
                     Font = new Font("Segoe UI", 9),
                     ForeColor = Color.DarkGray,
                     TextAlign = ContentAlignment.MiddleLeft
@@ -432,8 +439,8 @@ namespace GameHeatmap
                 Label lblGamesLoaded = new Label
                 {
                     Text = "Games loaded: 0",
-                    Location = new Point(30, 85),
-                    Size = new Size(440, 25),
+                    Location = new Point(Scale(30), Scale(85)),
+                    Size = new Size(Scale(440), Scale(25)),
                     Font = new Font("Segoe UI", 10, FontStyle.Bold),
                     ForeColor = Color.DarkBlue,
                     TextAlign = ContentAlignment.MiddleLeft
@@ -442,8 +449,8 @@ namespace GameHeatmap
 
                 ProgressBar progressBar = new ProgressBar
                 {
-                    Location = new Point(30, 120),
-                    Size = new Size(440, 35),
+                    Location = new Point(Scale(30), Scale(120)),
+                    Size = new Size(Scale(440), Scale(35)),
                     Style = ProgressBarStyle.Marquee,
                     MarqueeAnimationSpeed = 30
                 };
@@ -458,8 +465,8 @@ namespace GameHeatmap
                 btnStopAndUse = new Button
                 {
                     Text = "Stop & Use Partial",
-                    Location = new Point(260, 175),
-                    Size = new Size(140, 30),
+                    Location = new Point(Scale(260), Scale(175)),
+                    Size = new Size(Scale(140), Scale(30)),
                     BackColor = Color.LightGreen
                 };
                 btnStopAndUse.Click += (s, args) =>
@@ -475,8 +482,8 @@ namespace GameHeatmap
                 btnCancel = new Button
                 {
                     Text = "Cancel",
-                    Location = new Point(140, 175),
-                    Size = new Size(100, 30),
+                    Location = new Point(Scale(140), Scale(175)),
+                    Size = new Size(Scale(100), Scale(30)),
                     DialogResult = DialogResult.Cancel
                 };
                 btnCancel.Click += (s, args) =>
@@ -1718,12 +1725,18 @@ namespace GameHeatmap
                     IsWhiteMove = child.IsWhiteMove,
                     Frequency = child.Frequency
                 };
-                
+
                 freqNode.Children[child.San] = childFreqNode;
-                
+
                 // Recurse
                 ConvertHeatmapNode(child, childFreqNode);
             }
+        }
+
+        // Helper method to scale sizes based on DPI
+        private int Scale(int value)
+        {
+            return (int)(value * dpiScale);
         }
     }
 }

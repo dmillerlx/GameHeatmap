@@ -50,6 +50,7 @@ namespace GameHeatmap
         private string lastPgnPath = "";
         private MoveNode? outputRoot = null;  // Store the generated tree
         private bool isLoadingSettings = false;  // Flag to prevent saving during load
+        private float dpiScale = 1.0f;
 
         public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, MoveFrequencyTree? databaseTree, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null)
         {
@@ -64,6 +65,12 @@ namespace GameHeatmap
 
             // Save settings when form closes
             this.FormClosing += (s, e) => SaveSettings();
+        }
+
+        // Helper method to scale sizes based on DPI
+        private int Scale(int value)
+        {
+            return (int)(value * dpiScale);
         }
         
         private void LoadSettings()
@@ -126,10 +133,16 @@ namespace GameHeatmap
         
         private void InitializeComponent()
         {
+            // Get DPI scaling factor
+            using (Graphics g = this.CreateGraphics())
+            {
+                dpiScale = g.DpiX / 96f; // 96 DPI is 100% scaling
+            }
+
             this.Text = "Opening Builder";
-            this.Size = new Size(1400, 800);
+            this.Size = new Size(Scale(1400), Scale(800));
             this.StartPosition = FormStartPosition.CenterScreen;
-            
+
             // Split container for left/right panes
             SplitContainer splitContainer = new SplitContainer
             {
@@ -137,7 +150,7 @@ namespace GameHeatmap
                 SplitterDistance = this.ClientSize.Width / 2,  // 50/50 split
                 Orientation = Orientation.Vertical
             };
-            
+
             // LEFT PANEL - Mainline Input
             leftPanel = new Panel { Dock = DockStyle.Fill };
 
@@ -161,21 +174,21 @@ namespace GameHeatmap
             {
                 Text = "MAINLINE (Drag & Drop PGN)",
                 Dock = DockStyle.Top,
-                Height = 30,
+                Height = Scale(30),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(5),
+                Padding = new Padding(Scale(5)),
                 BackColor = Color.LightBlue
             };
             leftPanel.Controls.Add(lblLeft);
 
             // Button panel - add LAST (will appear at the very top)
-            Panel leftButtonPanel = new Panel { Dock = DockStyle.Top, Height = 40 };
+            Panel leftButtonPanel = new Panel { Dock = DockStyle.Top, Height = Scale(40) };
             btnLoadMainline = new Button
             {
                 Text = "Load PGN File",
-                Location = new Point(5, 5),
-                Size = new Size(120, 30)
+                Location = new Point(Scale(5), Scale(5)),
+                Size = new Size(Scale(120), Scale(30))
             };
             btnLoadMainline.Click += BtnLoadMainline_Click;
             leftButtonPanel.Controls.Add(btnLoadMainline);
@@ -185,19 +198,19 @@ namespace GameHeatmap
             
             // RIGHT PANEL - Variation Tree
             rightPanel = new Panel { Dock = DockStyle.Fill };
-            
+
             Label lblRight = new Label
             {
                 Text = "GENERATED OPENING TREE",
                 Dock = DockStyle.Top,
-                Height = 30,
+                Height = Scale(30),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(5),
+                Padding = new Padding(Scale(5)),
                 BackColor = Color.LightGreen
             };
             rightPanel.Controls.Add(lblRight);
-            
+
             treeVariations = new TreeView
             {
                 Dock = DockStyle.Fill,
@@ -207,18 +220,18 @@ namespace GameHeatmap
             };
             rightPanel.Controls.Add(treeVariations);
             treeVariations.BringToFront();
-            
+
             splitContainer.Panel2.Controls.Add(rightPanel);
-            
+
             // TOP PANEL - Configuration (redesigned for better space usage)
-            Panel topPanel = new Panel { Dock = DockStyle.Top, Height = 140, Padding = new Padding(10) };
+            Panel topPanel = new Panel { Dock = DockStyle.Top, Height = Scale(140), Padding = new Padding(Scale(10)) };
 
             // ROW 1: Theodore color + Numeric settings
             lblTheodoreColor = new Label
             {
                 Text = $"Theodore plays: {(theodorePlaysWhite ? "WHITE" : "BLACK")}",
-                Location = new Point(10, 10),
-                Size = new Size(150, 25),
+                Location = new Point(Scale(10), Scale(10)),
+                Size = new Size(Scale(150), Scale(25)),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = theodorePlaysWhite ? Color.White : Color.Black,
                 BackColor = theodorePlaysWhite ? Color.DarkGreen : Color.White,
@@ -227,85 +240,85 @@ namespace GameHeatmap
             };
             topPanel.Controls.Add(lblTheodoreColor);
 
-            Label lblMaxBranches = new Label { Text = "Branches:", Location = new Point(170, 12), Size = new Size(65, 20) };
+            Label lblMaxBranches = new Label { Text = "Branches:", Location = new Point(Scale(170), Scale(12)), Size = new Size(Scale(65), Scale(20)) };
             topPanel.Controls.Add(lblMaxBranches);
-            numMaxBranches = new NumericUpDown { Location = new Point(240, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 10, Value = 3 };
+            numMaxBranches = new NumericUpDown { Location = new Point(Scale(240), Scale(10)), Size = new Size(Scale(50), Scale(25)), Minimum = 1, Maximum = 10, Value = 3 };
             topPanel.Controls.Add(numMaxBranches);
 
-            Label lblPercent = new Label { Text = "%:", Location = new Point(300, 12), Size = new Size(25, 20) };
+            Label lblPercent = new Label { Text = "%:", Location = new Point(Scale(300), Scale(12)), Size = new Size(Scale(25), Scale(20)) };
             topPanel.Controls.Add(lblPercent);
-            numPercentThreshold = new NumericUpDown { Location = new Point(325, 10), Size = new Size(50, 25), Minimum = 50, Maximum = 100, Value = 90 };
+            numPercentThreshold = new NumericUpDown { Location = new Point(Scale(325), Scale(10)), Size = new Size(Scale(50), Scale(25)), Minimum = 50, Maximum = 100, Value = 90 };
             topPanel.Controls.Add(numPercentThreshold);
 
-            Label lblMaxDepth = new Label { Text = "Depth:", Location = new Point(385, 12), Size = new Size(45, 20) };
+            Label lblMaxDepth = new Label { Text = "Depth:", Location = new Point(Scale(385), Scale(12)), Size = new Size(Scale(45), Scale(20)) };
             topPanel.Controls.Add(lblMaxDepth);
-            numMaxDepth = new NumericUpDown { Location = new Point(430, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 50, Value = 10 };
+            numMaxDepth = new NumericUpDown { Location = new Point(Scale(430), Scale(10)), Size = new Size(Scale(50), Scale(25)), Minimum = 1, Maximum = 50, Value = 10 };
             topPanel.Controls.Add(numMaxDepth);
 
-            Label lblStartMove = new Label { Text = "Start after:", Location = new Point(490, 12), Size = new Size(70, 20) };
+            Label lblStartMove = new Label { Text = "Start after:", Location = new Point(Scale(490), Scale(12)), Size = new Size(Scale(70), Scale(20)) };
             topPanel.Controls.Add(lblStartMove);
-            numStartMove = new NumericUpDown { Location = new Point(560, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 50, Value = 4 };
+            numStartMove = new NumericUpDown { Location = new Point(Scale(560), Scale(10)), Size = new Size(Scale(50), Scale(25)), Minimum = 1, Maximum = 50, Value = 4 };
             topPanel.Controls.Add(numStartMove);
 
-            chkExtendMainline = new CheckBox { Text = "Extend to:", Location = new Point(620, 12), Size = new Size(85, 20) };
+            chkExtendMainline = new CheckBox { Text = "Extend to:", Location = new Point(Scale(620), Scale(12)), Size = new Size(Scale(85), Scale(20)) };
             topPanel.Controls.Add(chkExtendMainline);
-            numExtendMainlineToMove = new NumericUpDown { Location = new Point(705, 10), Size = new Size(50, 25), Minimum = 1, Maximum = 100, Value = 20 };
+            numExtendMainlineToMove = new NumericUpDown { Location = new Point(Scale(705), Scale(10)), Size = new Size(Scale(50), Scale(25)), Minimum = 1, Maximum = 100, Value = 20 };
             topPanel.Controls.Add(numExtendMainlineToMove);
 
-            chkDebugOutput = new CheckBox { Text = "Debug", Location = new Point(765, 12), Size = new Size(70, 20) };
+            chkDebugOutput = new CheckBox { Text = "Debug", Location = new Point(Scale(765), Scale(12)), Size = new Size(Scale(70), Scale(20)) };
             topPanel.Controls.Add(chkDebugOutput);
             
             // ROW 2: Data source checkboxes
-            chkUseTheodoreGames = new CheckBox { Text = "Use Theodore Games", Location = new Point(10, 42), Size = new Size(150, 20), Checked = theodoreTree != null };
+            chkUseTheodoreGames = new CheckBox { Text = "Use Theodore Games", Location = new Point(Scale(10), Scale(42)), Size = new Size(Scale(150), Scale(20)), Checked = theodoreTree != null };
             topPanel.Controls.Add(chkUseTheodoreGames);
 
-            chkUseDatabaseGames = new CheckBox { Text = "Use Database", Location = new Point(170, 42), Size = new Size(120, 20), Checked = databaseTree != null };
+            chkUseDatabaseGames = new CheckBox { Text = "Use Database", Location = new Point(Scale(170), Scale(42)), Size = new Size(Scale(120), Scale(20)), Checked = databaseTree != null };
             topPanel.Controls.Add(chkUseDatabaseGames);
 
-            chkIncludeTheodoreAnnotations = new CheckBox { Text = "Theodore Annot", Location = new Point(300, 42), Size = new Size(120, 20), Checked = true };
+            chkIncludeTheodoreAnnotations = new CheckBox { Text = "Theodore Annot", Location = new Point(Scale(300), Scale(42)), Size = new Size(Scale(120), Scale(20)), Checked = true };
             chkIncludeTheodoreAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
             topPanel.Controls.Add(chkIncludeTheodoreAnnotations);
 
-            chkIncludeDatabaseAnnotations = new CheckBox { Text = "Database Annot", Location = new Point(430, 42), Size = new Size(120, 20), Checked = true };
+            chkIncludeDatabaseAnnotations = new CheckBox { Text = "Database Annot", Location = new Point(Scale(430), Scale(42)), Size = new Size(Scale(120), Scale(20)), Checked = true };
             chkIncludeDatabaseAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
             topPanel.Controls.Add(chkIncludeDatabaseAnnotations);
 
-            chkUseShortComments = new CheckBox { Text = "Short (T/DB)", Location = new Point(560, 42), Size = new Size(100, 20), Checked = false };
+            chkUseShortComments = new CheckBox { Text = "Short (T/DB)", Location = new Point(Scale(560), Scale(42)), Size = new Size(Scale(100), Scale(20)), Checked = false };
             chkUseShortComments.CheckedChanged += AnnotationCheckbox_CheckedChanged;
             topPanel.Controls.Add(chkUseShortComments);
 
             // ROW 3: Comment templates and max opponents
-            Label lblCommentTemplate = new Label { Text = "Theodore:", Location = new Point(10, 72), Size = new Size(65, 20) };
+            Label lblCommentTemplate = new Label { Text = "Theodore:", Location = new Point(Scale(10), Scale(72)), Size = new Size(Scale(65), Scale(20)) };
             topPanel.Controls.Add(lblCommentTemplate);
 
             txtCommentTemplate = new TextBox
             {
-                Location = new Point(75, 70),
-                Size = new Size(200, 25),
+                Location = new Point(Scale(75), Scale(70)),
+                Size = new Size(Scale(200), Scale(25)),
                 Text = "{opponent} ({date})",
                 Font = new Font("Consolas", 9)
             };
             topPanel.Controls.Add(txtCommentTemplate);
 
-            Label lblDatabaseTemplate = new Label { Text = "DB:", Location = new Point(285, 72), Size = new Size(30, 20) };
+            Label lblDatabaseTemplate = new Label { Text = "DB:", Location = new Point(Scale(285), Scale(72)), Size = new Size(Scale(30), Scale(20)) };
             topPanel.Controls.Add(lblDatabaseTemplate);
 
             txtDatabaseCommentTemplate = new TextBox
             {
-                Location = new Point(315, 70),
-                Size = new Size(160, 25),
+                Location = new Point(Scale(315), Scale(70)),
+                Size = new Size(Scale(160), Scale(25)),
                 Text = "Database: {count}",
                 Font = new Font("Consolas", 9)
             };
             topPanel.Controls.Add(txtDatabaseCommentTemplate);
 
-            Label lblMaxOpponents = new Label { Text = "Max:", Location = new Point(485, 72), Size = new Size(35, 20) };
+            Label lblMaxOpponents = new Label { Text = "Max:", Location = new Point(Scale(485), Scale(72)), Size = new Size(Scale(35), Scale(20)) };
             topPanel.Controls.Add(lblMaxOpponents);
 
             numMaxOpponentsInComments = new NumericUpDown
             {
-                Location = new Point(520, 70),
-                Size = new Size(50, 25),
+                Location = new Point(Scale(520), Scale(70)),
+                Size = new Size(Scale(50), Scale(25)),
                 Minimum = 1,
                 Maximum = 25,
                 Value = 3
@@ -315,8 +328,8 @@ namespace GameHeatmap
             Label lblTemplateHelp = new Label
             {
                 Text = "Use: {opponent} {date} {event} {count}",
-                Location = new Point(580, 72),
-                Size = new Size(250, 20),
+                Location = new Point(Scale(580), Scale(72)),
+                Size = new Size(Scale(250), Scale(20)),
                 ForeColor = Color.Gray,
                 Font = new Font("Segoe UI", 8, FontStyle.Italic)
             };
@@ -326,8 +339,8 @@ namespace GameHeatmap
             btnGenerate = new Button
             {
                 Text = "Generate Opening Tree",
-                Location = new Point(10, 100),
-                Size = new Size(180, 35),
+                Location = new Point(Scale(10), Scale(100)),
+                Size = new Size(Scale(180), Scale(35)),
                 BackColor = Color.LightGreen,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
@@ -337,8 +350,8 @@ namespace GameHeatmap
             btnSave = new Button
             {
                 Text = "Save to PGN",
-                Location = new Point(200, 100),
-                Size = new Size(120, 35),
+                Location = new Point(Scale(200), Scale(100)),
+                Size = new Size(Scale(120), Scale(35)),
                 Enabled = false
             };
             btnSave.Click += BtnSave_Click;
@@ -347,8 +360,8 @@ namespace GameHeatmap
             btnCopy = new Button
             {
                 Text = "Copy PGN",
-                Location = new Point(330, 100),
-                Size = new Size(100, 35),
+                Location = new Point(Scale(330), Scale(100)),
+                Size = new Size(Scale(100), Scale(35)),
                 Enabled = false
             };
             btnCopy.Click += BtnCopy_Click;
@@ -357,8 +370,8 @@ namespace GameHeatmap
             btnClear = new Button
             {
                 Text = "Clear",
-                Location = new Point(440, 100),
-                Size = new Size(80, 35)
+                Location = new Point(Scale(440), Scale(100)),
+                Size = new Size(Scale(80), Scale(35))
             };
             btnClear.Click += BtnClear_Click;
             topPanel.Controls.Add(btnClear);

@@ -3,10 +3,6 @@
   "WorkspaceRootPath": "C:\\data\\chess\\apps\\GameHeatmap\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\duplicate_move_fix_instructions.txt||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\duplicate_move_fix_instructions.txt||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\openingbuilderform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\openingbuilderform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -34,45 +30,33 @@
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "RegistryUtils.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\RegistryUtils.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\RegistryUtils.cs",
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\RegistryUtils.cs",
               "RelativeToolTip": "GameHeatmap\\RegistryUtils.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAASAAAAAAAAAA==",
+              "ViewState": "AgIAAAIAAAAAAAAAAAAAABQAAAASAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-23T08:19:24.954Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "DUPLICATE_MOVE_FIX_INSTRUCTIONS.txt",
-              "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\DUPLICATE_MOVE_FIX_INSTRUCTIONS.txt",
-              "RelativeDocumentMoniker": "GameHeatmap\\DUPLICATE_MOVE_FIX_INSTRUCTIONS.txt",
-              "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\DUPLICATE_MOVE_FIX_INSTRUCTIONS.txt",
-              "RelativeToolTip": "GameHeatmap\\DUPLICATE_MOVE_FIX_INSTRUCTIONS.txt",
-              "ViewState": "AgIAAEEAAAAAAAAAAADwv1EAAAARAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003109|",
-              "WhenOpened": "2025-12-23T07:39:27.619Z",
+              "WhenOpened": "2025-12-23T08:19:24.954Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "OpeningBuilderForm.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\OpeningBuilderForm.cs",
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
               "RelativeToolTip": "GameHeatmap\\OpeningBuilderForm.cs",
-              "ViewState": "AgIAAFUAAAAAAAAAAADgv2YAAABWAAAAAAAAAA==",
+              "ViewState": "AgIAAFUAAAAAAAAAAADgv2YAAAAiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-12-20T01:12:58.268Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 2,
               "Title": "MoveFrequencyTree.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\MoveFrequencyTree.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\MoveFrequencyTree.cs",
@@ -84,7 +68,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 3,
               "Title": "Form1.cs [Design]",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\Form1.cs",

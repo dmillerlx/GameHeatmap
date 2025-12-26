@@ -11,6 +11,7 @@ namespace GameHeatmap
         private TreeView treeView;
         private Label lblStats;
         private MoveFrequencyTree? freqTree;
+        private float dpiScale = 1.0f;
 
         public DatabaseTreeForm(MoveFrequencyTree freqTree)
         {
@@ -19,10 +20,21 @@ namespace GameHeatmap
             BuildTree();
         }
 
+        private int Scale(int value)
+        {
+            return (int)(value * dpiScale);
+        }
+
         private void InitializeComponent()
         {
+            // Get DPI scaling factor
+            using (Graphics g = this.CreateGraphics())
+            {
+                dpiScale = g.DpiX / 96f; // 96 DPI is 100% scaling
+            }
+
             this.Text = "Database Move Frequency Tree";
-            this.Size = new Size(1000, 700);
+            this.Size = new Size(Scale(1000), Scale(700));
             this.StartPosition = FormStartPosition.CenterScreen;
 
             // TreeView - ADD FIRST so it fills remaining space
@@ -44,15 +56,15 @@ namespace GameHeatmap
             Panel buttonPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 35,
-                Padding = new Padding(5)
+                Height = Scale(35),
+                Padding = new Padding(Scale(5))
             };
 
             Button btnExpandAll = new Button
             {
                 Text = "Expand All (WARNING: SLOW!)",
-                Location = new Point(5, 5),
-                Size = new Size(200, 25),
+                Location = new Point(Scale(5), Scale(5)),
+                Size = new Size(Scale(200), Scale(25)),
                 BackColor = Color.LightCoral
             };
             btnExpandAll.Click += (s, e) =>
@@ -68,8 +80,8 @@ namespace GameHeatmap
             Button btnCollapseAll = new Button
             {
                 Text = "Collapse All",
-                Location = new Point(215, 5),
-                Size = new Size(100, 25)
+                Location = new Point(Scale(215), Scale(5)),
+                Size = new Size(Scale(100), Scale(25))
             };
             btnCollapseAll.Click += (s, e) => treeView.CollapseAll();
             buttonPanel.Controls.Add(btnCollapseAll);
@@ -81,11 +93,11 @@ namespace GameHeatmap
             {
                 Text = "Colors: Bold Red (80%+) | Dark Red (50-79%) | Orange (20-49%) | Gray (<20%)  |  Format: Move (frequency = %)  |  LAZY LOADING: Expand nodes to see moves",
                 Dock = DockStyle.Top,
-                Height = 25,
+                Height = Scale(25),
                 Font = new Font("Segoe UI", 9),
                 ForeColor = Color.DarkSlateGray,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10, 5, 10, 0),
+                Padding = new Padding(Scale(10), Scale(5), Scale(10), 0),
                 BackColor = Color.WhiteSmoke
             };
             this.Controls.Add(lblLegend);
@@ -94,10 +106,10 @@ namespace GameHeatmap
             lblStats = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 30,
+                Height = Scale(30),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10, 5, 10, 5),
+                Padding = new Padding(Scale(10), Scale(5), Scale(10), Scale(5)),
                 BackColor = Color.LightSteelBlue
             };
             this.Controls.Add(lblStats);

@@ -11,16 +11,28 @@ namespace GameHeatmap
         private DataGridView dgvGames;
         private Label lblTitle;
         private Label lblStats;
+        private float dpiScale = 1.0f;
 
         public GameDetailsForm(HeatmapNode node, bool isFilteredForWhite)
         {
             InitializeComponent(node, isFilteredForWhite);
         }
 
+        private int Scale(int value)
+        {
+            return (int)(value * dpiScale);
+        }
+
         private void InitializeComponent(HeatmapNode node, bool isFilteredForWhite)
         {
+            // Get DPI scaling factor
+            using (Graphics g = this.CreateGraphics())
+            {
+                dpiScale = g.DpiX / 96f; // 96 DPI is 100% scaling
+            }
+
             this.Text = $"Games with move: {node.San}";
-            this.Size = new Size(900, 600);
+            this.Size = new Size(Scale(900), Scale(600));
             this.StartPosition = FormStartPosition.CenterScreen;
 
             // DataGridView (ADD FIRST - Fill takes remaining space)
@@ -126,10 +138,10 @@ namespace GameHeatmap
             {
                 Text = $"Results: {wins} wins, {losses} losses, {draws} draws",
                 Dock = DockStyle.Top,
-                Height = 30,
+                Height = Scale(30),
                 Font = new Font("Segoe UI", 10),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10, 5, 10, 5),
+                Padding = new Padding(Scale(10), Scale(5), Scale(10), Scale(5)),
                 BackColor = Color.WhiteSmoke
             };
             this.Controls.Add(lblStats);
@@ -139,10 +151,10 @@ namespace GameHeatmap
             {
                 Text = $"Move: {node.San} (played {node.Frequency} times)",
                 Dock = DockStyle.Top,
-                Height = 35,
+                Height = Scale(35),
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(10, 5, 10, 5),
+                Padding = new Padding(Scale(10), Scale(5), Scale(10), Scale(5)),
                 BackColor = Color.LightSteelBlue
             };
             this.Controls.Add(lblTitle);
