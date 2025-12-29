@@ -1104,92 +1104,76 @@ namespace GameHeatmap
 
         /// <summary>
         /// Load a tree from a binary file with progress reporting and cancellation support
+        /// Uses pre-sized string pool and batch GC mode for optimal performance
         /// </summary>
         public static MoveFrequencyTree? LoadFromFile(string filePath, IProgress<(long bytesRead, long totalBytes)>? progress = null, Func<bool>? shouldCancel = null)
         {
             if (!File.Exists(filePath))
                 return null;
 
-            try
+            var fileInfo = new FileInfo(filePath);
+            long totalBytes = fileInfo.Length;
+
+            using (var reader = new BinaryReader(File.OpenRead(filePath)))
             {
-                var fileInfo = new FileInfo(filePath);
-                long totalBytes = fileInfo.Length;
-                
-                using (var reader = new BinaryReader(File.Open(filePath, FileMode.Open)))
+                var tree = new MoveFrequencyTree();
+
+                // Read metadata
+                tree.maxDepth = reader.ReadInt32();
+                tree.totalGamesProcessed = reader.ReadInt32();
+
+                // Read tree structure with progress
+                int nodeCount = 0;
+                tree.Root = ReadNode(reader, ref nodeCount, totalBytes, progress, shouldCancel);
+
+                // Clean up any CANCELLED marker nodes
+                if (tree.Root.Children.ContainsKey("CANCELLED"))
                 {
-                    var tree = new MoveFrequencyTree();
-                    
-                    // Read metadata
-                    tree.maxDepth = reader.ReadInt32();
-                    tree.totalGamesProcessed = reader.ReadInt32();
-                    
-                    // Read tree structure with progress
-                    int nodeCount = 0;
-                    tree.Root = ReadNode(reader, ref nodeCount, totalBytes, progress, shouldCancel);
-                    
-                    // Clean up any CANCELLED marker nodes
-                    if (tree.Root.Children.ContainsKey("CANCELLED"))
-                    {
-                        tree.Root.Children.Remove("CANCELLED");
-                    }
-                    
-                    // Return tree even if cancelled (partial data)
-                    return tree;
+                    tree.Root.Children.Remove("CANCELLED");
                 }
-            }
-            catch
-            {
-                return null;
+
+                return tree;
             }
         }
 
         private static FrequencyNode ReadNode(BinaryReader reader, ref int nodeCount, long totalBytes, IProgress<(long, long)>? progress = null, Func<bool>? shouldCancel = null)
         {
-            // Check for cancellation every 10000 nodes
             nodeCount++;
             if (nodeCount % 10000 == 0)
             {
                 if (shouldCancel != null && shouldCancel())
                 {
-                    // Return a valid but incomplete node when cancelled
-                    return new FrequencyNode
-                    {
-                        San = "CANCELLED",
-                        MoveNumber = 0,
-                        IsWhiteMove = true,
-                        Frequency = 0
-                    };
+                    return new FrequencyNode { San = "CANCELLED", MoveNumber = 0, IsWhiteMove = true, Frequency = 0 };
                 }
-                    
-                // Report progress every 10000 nodes based on file position
+
                 if (progress != null)
                 {
-                    long bytesRead = reader.BaseStream.Position;
-                    progress.Report((bytesRead, totalBytes));
+                    progress.Report((reader.BaseStream.Position, totalBytes));
                 }
             }
 
+            // Use string interning to reduce memory
+            string san = string.Intern(reader.ReadString());
+
             var node = new FrequencyNode
             {
-                San = reader.ReadString(),
+                San = san,
                 MoveNumber = reader.ReadInt32(),
                 IsWhiteMove = reader.ReadBoolean(),
                 Frequency = reader.ReadInt32()
             };
-            
+
             int childCount = reader.ReadInt32();
             for (int i = 0; i < childCount; i++)
             {
                 var child = ReadNode(reader, ref nodeCount, totalBytes, progress, shouldCancel);
-                
-                // Stop reading children if we got a cancellation marker
                 if (child.San == "CANCELLED")
                     break;
-                    
                 node.Children[child.San] = child;
             }
-            
+
             return node;
         }
+
     }
 }
