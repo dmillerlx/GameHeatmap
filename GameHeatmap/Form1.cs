@@ -36,6 +36,17 @@ namespace GameHeatmap
         private Button btnSaveDatabase = null!;
         private Button btnLoadCachedDatabase = null!;
 
+        // Binary blob navigator (new fast format)
+        private BinaryTreeNavigator? binaryNavigator = null;
+        private Button btnSaveBlob = null!;
+        private Button btnLoadBlob = null!;
+        private Button btnUnloadTree = null!;
+        private Button btnUnloadBlob = null!;
+        private RadioButton rbUseTree = null!;
+        private RadioButton rbUseBlob = null!;
+        private Label lblTreeStatus = null!;
+        private Label lblBlobStatus = null!;
+
         private Dictionary<TreeNode, HeatmapNode> nodeToHeatmap = new Dictionary<TreeNode, HeatmapNode>();
         private float dpiScale = 1.0f;
 
@@ -206,6 +217,104 @@ namespace GameHeatmap
             };
             btnLoadCachedDatabase.Click += BtnLoadCachedDatabase_Click;
             leftPanel.Controls.Add(btnLoadCachedDatabase);
+            yPos += Scale(35);
+
+            // Unload buttons
+            btnUnloadTree = new Button
+            {
+                Text = "Unload Tree",
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(145), Scale(30)),
+                BackColor = Color.MistyRose,
+                Enabled = false
+            };
+            btnUnloadTree.Click += BtnUnloadTree_Click;
+            leftPanel.Controls.Add(btnUnloadTree);
+
+            btnUnloadBlob = new Button
+            {
+                Text = "Unload Blob",
+                Location = new Point(Scale(165), yPos),
+                Size = new Size(Scale(145), Scale(30)),
+                BackColor = Color.MistyRose,
+                Enabled = false
+            };
+            btnUnloadBlob.Click += BtnUnloadBlob_Click;
+            leftPanel.Controls.Add(btnUnloadBlob);
+            yPos += Scale(35);
+
+            // Blob buttons
+            btnSaveBlob = new Button
+            {
+                Text = "Save Blob",
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(145), Scale(30)),
+                BackColor = Color.LightSteelBlue,
+                Enabled = false
+            };
+            btnSaveBlob.Click += BtnSaveBlob_Click;
+            leftPanel.Controls.Add(btnSaveBlob);
+
+            btnLoadBlob = new Button
+            {
+                Text = "Load Blob",
+                Location = new Point(Scale(165), yPos),
+                Size = new Size(Scale(145), Scale(30)),
+                BackColor = Color.LightSkyBlue
+            };
+            btnLoadBlob.Click += BtnLoadBlob_Click;
+            leftPanel.Controls.Add(btnLoadBlob);
+            yPos += Scale(35);
+
+            // Format selection radio buttons
+            Label lblFormatLabel = new Label
+            {
+                Text = "Query Source:",
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(20))
+            };
+            leftPanel.Controls.Add(lblFormatLabel);
+            yPos += Scale(22);
+
+            rbUseTree = new RadioButton
+            {
+                Text = "Tree (mutable)",
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(145), Scale(22)),
+                Checked = true
+            };
+            rbUseTree.CheckedChanged += RbFormat_CheckedChanged;
+            leftPanel.Controls.Add(rbUseTree);
+
+            rbUseBlob = new RadioButton
+            {
+                Text = "Blob (fast)",
+                Location = new Point(Scale(165), yPos),
+                Size = new Size(Scale(145), Scale(22))
+            };
+            rbUseBlob.CheckedChanged += RbFormat_CheckedChanged;
+            leftPanel.Controls.Add(rbUseBlob);
+            yPos += Scale(27);
+
+            // Status labels
+            lblTreeStatus = new Label
+            {
+                Text = "Tree: Not loaded",
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(20)),
+                ForeColor = Color.Gray
+            };
+            leftPanel.Controls.Add(lblTreeStatus);
+            yPos += Scale(22);
+
+            lblBlobStatus = new Label
+            {
+                Text = "Blob: Not loaded",
+                Location = new Point(Scale(10), yPos),
+                Size = new Size(Scale(300), Scale(20)),
+                ForeColor = Color.Gray
+            };
+            leftPanel.Controls.Add(lblBlobStatus);
             yPos += Scale(40);
 
             // Opening Builder button
@@ -379,11 +488,29 @@ namespace GameHeatmap
             chkShowTooltips.Checked = showTooltipsPref;
             showTooltips = showTooltipsPref;
 
-            // Auto-load last cache file
-            string lastCachePath = RegistryUtils.GetString("LastCachePath", "");
-            if (!string.IsNullOrEmpty(lastCachePath) && File.Exists(lastCachePath))
+            // Auto-load last tree file (if saved)
+            string lastTreePath = RegistryUtils.GetString("LastTreePath", "");
+            if (!string.IsNullOrEmpty(lastTreePath) && File.Exists(lastTreePath))
             {
-                AutoLoadCacheFile(lastCachePath);
+                AutoLoadCacheFile(lastTreePath);
+            }
+
+            // Auto-load last blob file (if saved)
+            string lastBlobPath = RegistryUtils.GetString("LastBlobPath", "");
+            if (!string.IsNullOrEmpty(lastBlobPath) && File.Exists(lastBlobPath))
+            {
+                AutoLoadBlobFile(lastBlobPath);
+            }
+
+            // Restore format preference
+            string preferredFormat = RegistryUtils.GetString("PreferredFormat", "tree");
+            if (preferredFormat == "blob" && binaryNavigator != null)
+            {
+                rbUseBlob.Checked = true;
+            }
+            else if (databaseTree != null)
+            {
+                rbUseTree.Checked = true;
             }
 
             // Auto-load last Theodore PGN files
@@ -580,6 +707,9 @@ namespace GameHeatmap
                         databaseTree = loadedTree;
                         btnViewDatabase.Enabled = true;
                         btnSaveDatabase.Enabled = true;
+                        btnSaveBlob.Enabled = true;
+                        btnUnloadTree.Enabled = true;
+                        UpdateStatusLabels();
                         lblStatus.Text = $"Auto-loaded cache: {databaseTree.TotalGamesProcessed:N0} games";
                     }
                     // Silently fail if error - don't show error on startup
@@ -589,6 +719,24 @@ namespace GameHeatmap
                     progressForm.Close();
                     // Silently fail - don't show error on startup
                 }
+            }
+        }
+
+        private void AutoLoadBlobFile(string filePath)
+        {
+            try
+            {
+                binaryNavigator = new BinaryTreeNavigator();
+                binaryNavigator.Load(filePath);
+
+                btnUnloadBlob.Enabled = true;
+                btnViewDatabase.Enabled = true;
+                UpdateStatusLabels();
+                lblStatus.Text = $"Auto-loaded blob: {binaryNavigator.TotalGames:N0} games";
+            }
+            catch (Exception)
+            {
+                // Silently fail - don't show error on startup
             }
         }
 
@@ -1406,15 +1554,76 @@ namespace GameHeatmap
 
         private void BtnViewDatabase_Click(object? sender, EventArgs e)
         {
-            if (databaseTree == null || databaseTree.TotalGamesProcessed == 0)
+            // Determine which format to use and pass directly (no materialization!)
+            if (rbUseBlob.Checked && binaryNavigator != null)
             {
-                MessageBox.Show("No database loaded. Click 'Load Database' first.", "No Data",
+                // Use blob navigator directly - FAST!
+                var dbForm = new DatabaseTreeForm(binaryNavigator);
+                dbForm.ShowDialog(this);
+            }
+            else if (rbUseTree.Checked && databaseTree != null)
+            {
+                // Use tree format
+                var dbForm = new DatabaseTreeForm(databaseTree);
+                dbForm.ShowDialog(this);
+            }
+            else if (databaseTree != null)
+            {
+                // Fallback to tree if available
+                var dbForm = new DatabaseTreeForm(databaseTree);
+                dbForm.ShowDialog(this);
+            }
+            else if (binaryNavigator != null)
+            {
+                // Fallback to blob if available
+                var dbForm = new DatabaseTreeForm(binaryNavigator);
+                dbForm.ShowDialog(this);
+            }
+            else
+            {
+                MessageBox.Show("No database loaded. Click 'Load Cache' or 'Load Blob' first.", "No Data",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
+            }
+        }
+
+        private MoveFrequencyTree MaterializeTreeFromBlob(BinaryTreeNavigator navigator)
+        {
+            var tree = new MoveFrequencyTree();
+
+            // Recursively materialize the entire tree from blob
+            var rootNode = MaterializeNodeRecursive(navigator, navigator.RootOffset);
+
+            // Use reflection to set the Root property (has private setter)
+            var rootProperty = typeof(MoveFrequencyTree).GetProperty("Root");
+            rootProperty?.SetValue(tree, rootNode);
+
+            // Set total games (use reflection to set private field)
+            var totalGamesField = typeof(MoveFrequencyTree).GetField("totalGamesProcessed",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            totalGamesField?.SetValue(tree, navigator.TotalGames);
+
+            return tree;
+        }
+
+        private FrequencyNode MaterializeNodeRecursive(BinaryTreeNavigator navigator, int nodeOffset)
+        {
+            var node = new FrequencyNode
+            {
+                San = navigator.GetSan(nodeOffset),
+                MoveNumber = navigator.GetMoveNumber(nodeOffset),
+                IsWhiteMove = navigator.IsWhiteMove(nodeOffset),
+                Frequency = navigator.GetFrequency(nodeOffset)
+            };
+
+            // Recursively materialize all children
+            var children = navigator.GetChildren(nodeOffset);
+            foreach (var (san, childOffset, freq) in children)
+            {
+                var childNode = MaterializeNodeRecursive(navigator, childOffset);
+                node.Children[san] = childNode;
             }
 
-            var dbForm = new DatabaseTreeForm(databaseTree);
-            dbForm.ShowDialog(this);
+            return node;
         }
 
         private void BtnSaveDatabase_Click(object? sender, EventArgs e)
@@ -1424,6 +1633,90 @@ namespace GameHeatmap
                 MessageBox.Show("No database loaded to save.", "No Data",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
+            }
+
+            // Show chunk size configuration dialog
+            int chunkSizeMB = 1024; // Default 1GB
+            using (var configForm = new Form())
+            {
+                configForm.Text = "Save Database Configuration";
+                configForm.Size = new Size(450, 220);
+                configForm.StartPosition = FormStartPosition.CenterParent;
+                configForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                configForm.MaximizeBox = false;
+                configForm.MinimizeBox = false;
+
+                Label lblInfo = new Label
+                {
+                    Text = "Configure chunk size for saving database cache:",
+                    Location = new Point(20, 20),
+                    Size = new Size(400, 20),
+                    Font = new Font("Segoe UI", 10, FontStyle.Bold)
+                };
+                configForm.Controls.Add(lblInfo);
+
+                Label lblChunkSize = new Label
+                {
+                    Text = "Chunk Size (MB):",
+                    Location = new Point(20, 60),
+                    Size = new Size(150, 25),
+                    Font = new Font("Segoe UI", 9),
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                configForm.Controls.Add(lblChunkSize);
+
+                NumericUpDown numChunkSize = new NumericUpDown
+                {
+                    Location = new Point(180, 58),
+                    Size = new Size(100, 25),
+                    Minimum = 10,
+                    Maximum = 10000,
+                    Value = 1024,
+                    Increment = 100,
+                    Font = new Font("Segoe UI", 9)
+                };
+                configForm.Controls.Add(numChunkSize);
+
+                Label lblHint = new Label
+                {
+                    Text = "Larger chunks = faster save but more memory usage.\nRecommended: 1024MB (1GB) for best performance.",
+                    Location = new Point(20, 95),
+                    Size = new Size(400, 40),
+                    Font = new Font("Segoe UI", 8),
+                    ForeColor = Color.DarkGray
+                };
+                configForm.Controls.Add(lblHint);
+
+                Button btnOk = new Button
+                {
+                    Text = "OK",
+                    Location = new Point(240, 145),
+                    Size = new Size(80, 30),
+                    DialogResult = DialogResult.OK,
+                    Font = new Font("Segoe UI", 9)
+                };
+                configForm.Controls.Add(btnOk);
+                configForm.AcceptButton = btnOk;
+
+                Button btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    Location = new Point(330, 145),
+                    Size = new Size(80, 30),
+                    DialogResult = DialogResult.Cancel,
+                    Font = new Font("Segoe UI", 9)
+                };
+                configForm.Controls.Add(btnCancel);
+                configForm.CancelButton = btnCancel;
+
+                if (configForm.ShowDialog(this) == DialogResult.OK)
+                {
+                    chunkSizeMB = (int)numChunkSize.Value;
+                }
+                else
+                {
+                    return; // User cancelled
+                }
             }
 
             using (SaveFileDialog sfd = new SaveFileDialog())
@@ -1436,10 +1729,11 @@ namespace GameHeatmap
                 {
                     try
                     {
-                        databaseTree.SaveToFile(sfd.FileName);
+                        databaseTree.SaveToFile(sfd.FileName, chunkSizeMB);
                         MessageBox.Show($"Database cache saved successfully!\n\n" +
                                       $"File: {Path.GetFileName(sfd.FileName)}\n" +
-                                      $"Games: {databaseTree.TotalGamesProcessed:N0}\n\n" +
+                                      $"Games: {databaseTree.TotalGamesProcessed:N0}\n" +
+                                      $"Chunk Size: {chunkSizeMB}MB\n\n" +
                                       $"Use 'Load Cache' to load instantly next time.",
                                       "Cache Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
@@ -1661,15 +1955,23 @@ namespace GameHeatmap
                             if (loadedTree != null)
                             {
                                 databaseTree = loadedTree;
-                                RegistryUtils.SetString("LastCachePath", ofd.FileName);
+                                RegistryUtils.SetString("LastTreePath", ofd.FileName); // Updated key name
+                                RegistryUtils.SetString("PreferredFormat", "tree");
+
                                 string partialMsg = usePartial ? $" (PARTIAL - {finalPercent:F1}% loaded)" : "";
                                 MessageBox.Show($"Database cache loaded successfully!{partialMsg}\n\n" +
                                               $"Games: {databaseTree.TotalGamesProcessed:N0}\n" +
                                               $"Load time: {totalElapsed.TotalSeconds:F1} seconds\n\n" +
                                               $"Click 'View Database' to see the tree.",
                                               "Cache Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
                                 btnViewDatabase.Enabled = true;
                                 btnSaveDatabase.Enabled = true;
+                                btnSaveBlob.Enabled = true;
+                                btnUnloadTree.Enabled = true;
+                                rbUseTree.Checked = true;
+
+                                UpdateStatusLabels();
                             }
                             else
                             {
@@ -1698,9 +2000,37 @@ namespace GameHeatmap
                 theodoreTree = ConvertHeatmapToFrequencyTree(heatmapBuilder);
             }
 
-            // Open the Opening Builder form - pass both the frequency tree and the heatmap
-            var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder);
-            builderForm.ShowDialog(this);
+            // Open the Opening Builder form - pass blob or tree based on selection
+            if (rbUseBlob.Checked && binaryNavigator != null)
+            {
+                // Pass blob navigator - will materialize only when Generate is clicked
+                var builderForm = new OpeningBuilderForm(theodoreTree, binaryNavigator, rbWhite.Checked, heatmapBuilder);
+                builderForm.ShowDialog(this);
+            }
+            else if (rbUseTree.Checked && databaseTree != null)
+            {
+                // Pass tree directly
+                var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder);
+                builderForm.ShowDialog(this);
+            }
+            else if (databaseTree != null)
+            {
+                // Fallback to tree
+                var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder);
+                builderForm.ShowDialog(this);
+            }
+            else if (binaryNavigator != null)
+            {
+                // Fallback to blob
+                var builderForm = new OpeningBuilderForm(theodoreTree, binaryNavigator, rbWhite.Checked, heatmapBuilder);
+                builderForm.ShowDialog(this);
+            }
+            else
+            {
+                // No database loaded
+                var builderForm = new OpeningBuilderForm(theodoreTree, (MoveFrequencyTree?)null, rbWhite.Checked, heatmapBuilder);
+                builderForm.ShowDialog(this);
+            }
         }
 
         private MoveFrequencyTree ConvertHeatmapToFrequencyTree(HeatmapBuilder heatmapBuilder)
@@ -1737,6 +2067,408 @@ namespace GameHeatmap
         private int Scale(int value)
         {
             return (int)(value * dpiScale);
+        }
+
+        // ===== Binary Blob Event Handlers =====
+
+        private void BtnSaveBlob_Click(object? sender, EventArgs e)
+        {
+            if (databaseTree == null)
+            {
+                MessageBox.Show("No tree loaded to save as blob.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Show chunk size configuration dialog
+            int chunkSizeMB = 1024; // Default 1GB
+            using (var configForm = new Form())
+            {
+                configForm.Text = "Save Blob Configuration";
+                configForm.Size = new Size(Scale(450), Scale(220));
+                configForm.StartPosition = FormStartPosition.CenterParent;
+                configForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                configForm.MaximizeBox = false;
+                configForm.MinimizeBox = false;
+
+                Label lblInfo = new Label
+                {
+                    Text = "Configure chunk size for saving blob:",
+                    Location = new Point(Scale(20), Scale(20)),
+                    Size = new Size(Scale(400), Scale(20)),
+                    Font = new Font("Segoe UI", 10, FontStyle.Bold)
+                };
+                configForm.Controls.Add(lblInfo);
+
+                Label lblChunkSize = new Label
+                {
+                    Text = "Chunk Size (MB):",
+                    Location = new Point(Scale(20), Scale(60)),
+                    Size = new Size(Scale(150), Scale(25)),
+                    Font = new Font("Segoe UI", 9),
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                configForm.Controls.Add(lblChunkSize);
+
+                NumericUpDown numChunkSize = new NumericUpDown
+                {
+                    Location = new Point(Scale(180), Scale(58)),
+                    Size = new Size(Scale(100), Scale(25)),
+                    Minimum = 10,
+                    Maximum = 10000,
+                    Value = 1024,
+                    Increment = 100,
+                    Font = new Font("Segoe UI", 9)
+                };
+                configForm.Controls.Add(numChunkSize);
+
+                Label lblHint = new Label
+                {
+                    Text = "Larger chunks = faster save but more memory usage.\nRecommended: 1024MB (1GB) for best performance.",
+                    Location = new Point(Scale(20), Scale(95)),
+                    Size = new Size(Scale(400), Scale(40)),
+                    Font = new Font("Segoe UI", 8),
+                    ForeColor = Color.DarkGray
+                };
+                configForm.Controls.Add(lblHint);
+
+                Button btnOk = new Button
+                {
+                    Text = "OK",
+                    Location = new Point(Scale(240), Scale(145)),
+                    Size = new Size(Scale(80), Scale(30)),
+                    DialogResult = DialogResult.OK,
+                    Font = new Font("Segoe UI", 9)
+                };
+                configForm.Controls.Add(btnOk);
+                configForm.AcceptButton = btnOk;
+
+                Button btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    Location = new Point(Scale(330), Scale(145)),
+                    Size = new Size(Scale(80), Scale(30)),
+                    DialogResult = DialogResult.Cancel,
+                    Font = new Font("Segoe UI", 9)
+                };
+                configForm.Controls.Add(btnCancel);
+                configForm.CancelButton = btnCancel;
+
+                if (configForm.ShowDialog(this) == DialogResult.OK)
+                {
+                    chunkSizeMB = (int)numChunkSize.Value;
+                }
+                else
+                {
+                    return; // User cancelled
+                }
+            }
+
+            var sfd = new SaveFileDialog
+            {
+                Filter = "Blob files (*.blob)|*.blob|All files (*.*)|*.*",
+                DefaultExt = "blob"
+            };
+
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    // Progress dialog
+                    Form progressForm = new Form
+                    {
+                        Text = "Saving Blob",
+                        Size = new Size(Scale(400), Scale(150)),
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        StartPosition = FormStartPosition.CenterParent,
+                        MaximizeBox = false,
+                        MinimizeBox = false
+                    };
+
+                    Label lblStatus = new Label
+                    {
+                        Text = "Building blob format...",
+                        Location = new Point(Scale(20), Scale(20)),
+                        Size = new Size(Scale(360), Scale(20))
+                    };
+                    progressForm.Controls.Add(lblStatus);
+
+                    ProgressBar progressBar = new ProgressBar
+                    {
+                        Location = new Point(Scale(20), Scale(50)),
+                        Size = new Size(Scale(360), Scale(25)),
+                        Style = ProgressBarStyle.Continuous
+                    };
+                    progressForm.Controls.Add(progressBar);
+
+                    Label lblProgress = new Label
+                    {
+                        Text = "0 / 0 nodes",
+                        Location = new Point(Scale(20), Scale(80)),
+                        Size = new Size(Scale(360), Scale(20))
+                    };
+                    progressForm.Controls.Add(lblProgress);
+
+                    progressForm.Show(this);
+
+                    // Force Gen 2 garbage collection before starting to free up memory
+                    lblStatus.Text = "Performing garbage collection...";
+                    Application.DoEvents();
+                    GC.Collect(2, GCCollectionMode.Forced, true, true);
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect(2, GCCollectionMode.Forced, true, true);
+                    lblStatus.Text = "Building blob format...";
+                    Application.DoEvents();
+
+                    var progress = new Progress<(int nodesWritten, int totalNodes)>(update =>
+                    {
+                        // Handle special case: -1 means "counting phase"
+                        if (update.nodesWritten == -1 && update.totalNodes == -1)
+                        {
+                            lblProgress.Text = "Counting nodes...";
+                            progressBar.Style = ProgressBarStyle.Marquee;
+                            return;
+                        }
+
+                        // Switch back to continuous style if we were in marquee
+                        if (progressBar.Style == ProgressBarStyle.Marquee)
+                        {
+                            progressBar.Style = ProgressBarStyle.Continuous;
+                        }
+
+                        // Use long to avoid overflow with large node counts (209M * 100 > int.MaxValue)
+                        int percent = update.totalNodes > 0 ? (int)((long)update.nodesWritten * 100 / update.totalNodes) : 0;
+                        progressBar.Value = Math.Max(0, Math.Min(percent, 100)); // Clamp to [0, 100]
+                        lblProgress.Text = $"{update.nodesWritten:N0} / {update.totalNodes:N0} nodes";
+                    });
+
+                    // Build blob on background thread
+                    var task = System.Threading.Tasks.Task.Run(() =>
+                    {
+                        var builder = new BinaryTreeBuilder();
+                        builder.BuildFromTree(databaseTree, sfd.FileName, progress, chunkSizeMB);
+                    });
+
+                    while (!task.IsCompleted)
+                    {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(100);
+                    }
+
+                    progressForm.Close();
+
+                    MessageBox.Show($"Blob saved successfully to:\n{sfd.FileName}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error saving blob: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void BtnLoadBlob_Click(object? sender, EventArgs e)
+        {
+            var ofd = new OpenFileDialog
+            {
+                Filter = "Blob files (*.blob)|*.blob|All files (*.*)|*.*",
+                Title = "Load Blob File"
+            };
+
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    // Progress dialog
+                    Form progressForm = new Form
+                    {
+                        Text = "Loading Blob",
+                        Size = new Size(Scale(400), Scale(150)),
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        StartPosition = FormStartPosition.CenterParent,
+                        MaximizeBox = false,
+                        MinimizeBox = false
+                    };
+
+                    Label lblStatus = new Label
+                    {
+                        Text = "Loading blob file...",
+                        Location = new Point(Scale(20), Scale(20)),
+                        Size = new Size(Scale(360), Scale(20))
+                    };
+                    progressForm.Controls.Add(lblStatus);
+
+                    ProgressBar progressBar = new ProgressBar
+                    {
+                        Location = new Point(Scale(20), Scale(50)),
+                        Size = new Size(Scale(360), Scale(25)),
+                        Style = ProgressBarStyle.Marquee
+                    };
+                    progressForm.Controls.Add(progressBar);
+
+                    progressForm.Show(this);
+
+                    var startTime = DateTime.Now;
+                    BinaryTreeNavigator? loadedNavigator = null;
+                    Exception? loadException = null;
+
+                    var loadTask = System.Threading.Tasks.Task.Run(() =>
+                    {
+                        try
+                        {
+                            loadedNavigator = new BinaryTreeNavigator();
+                            loadedNavigator.Load(ofd.FileName);
+                        }
+                        catch (Exception ex)
+                        {
+                            loadException = ex;
+                        }
+                    });
+
+                    while (!loadTask.IsCompleted)
+                    {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(100);
+                    }
+
+                    var elapsed = DateTime.Now - startTime;
+                    progressForm.Close();
+
+                    if (loadException != null)
+                    {
+                        MessageBox.Show($"Error loading blob: {loadException.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    binaryNavigator = loadedNavigator;
+                    btnUnloadBlob.Enabled = true;
+                    rbUseBlob.Checked = true; // Auto-select blob format
+
+                    UpdateStatusLabels();
+
+                    // Save to registry
+                    RegistryUtils.SetString("LastBlobPath", ofd.FileName);
+                    RegistryUtils.SetString("PreferredFormat", "blob");
+
+                    MessageBox.Show($"Blob loaded successfully!\n\n" +
+                                  $"Games: {binaryNavigator.TotalGames:N0}\n" +
+                                  $"Load time: {elapsed.TotalSeconds:F2}s",
+                                  "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error loading blob: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void BtnUnloadTree_Click(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show("Unload tree from memory?\n\nThis will free memory but you'll need to reload it to use tree format.",
+                                        "Confirm Unload",
+                                        MessageBoxButtons.YesNo,
+                                        MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                databaseTree = null;
+                btnUnloadTree.Enabled = false;
+                btnSaveBlob.Enabled = false;
+                btnSaveDatabase.Enabled = false;
+                btnViewDatabase.Enabled = databaseTree != null || binaryNavigator != null;
+
+                UpdateStatusLabels();
+
+                // Clear from registry (don't reload on startup)
+                RegistryUtils.SetString("LastTreePath", "");
+
+                // If blob is available, switch to it
+                if (binaryNavigator != null)
+                {
+                    rbUseBlob.Checked = true;
+                    RegistryUtils.SetString("PreferredFormat", "blob");
+                }
+
+                MessageBox.Show("Tree unloaded from memory.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void BtnUnloadBlob_Click(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show("Unload blob from memory?\n\nThis will free memory but you'll need to reload it to use blob format.",
+                                        "Confirm Unload",
+                                        MessageBoxButtons.YesNo,
+                                        MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                binaryNavigator = null;
+                btnUnloadBlob.Enabled = false;
+                btnViewDatabase.Enabled = databaseTree != null || binaryNavigator != null;
+
+                UpdateStatusLabels();
+
+                // Clear from registry (don't reload on startup)
+                RegistryUtils.SetString("LastBlobPath", "");
+
+                // If tree is available, switch to it
+                if (databaseTree != null)
+                {
+                    rbUseTree.Checked = true;
+                    RegistryUtils.SetString("PreferredFormat", "tree");
+                }
+
+                MessageBox.Show("Blob unloaded from memory.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void RbFormat_CheckedChanged(object? sender, EventArgs e)
+        {
+            // Save preference to registry
+            if (rbUseTree.Checked)
+            {
+                RegistryUtils.SetString("PreferredFormat", "tree");
+            }
+            else if (rbUseBlob.Checked)
+            {
+                RegistryUtils.SetString("PreferredFormat", "blob");
+            }
+        }
+
+        private void UpdateStatusLabels()
+        {
+            if (databaseTree != null)
+            {
+                lblTreeStatus.Text = $"Tree: Loaded ({databaseTree.TotalGamesProcessed:N0} games)";
+                lblTreeStatus.ForeColor = Color.Green;
+            }
+            else
+            {
+                lblTreeStatus.Text = "Tree: Not loaded";
+                lblTreeStatus.ForeColor = Color.Gray;
+            }
+
+            if (binaryNavigator != null)
+            {
+                lblBlobStatus.Text = $"Blob: Loaded ({binaryNavigator.TotalGames:N0} games)";
+                lblBlobStatus.ForeColor = Color.Blue;
+            }
+            else
+            {
+                lblBlobStatus.Text = "Blob: Not loaded";
+                lblBlobStatus.ForeColor = Color.Gray;
+            }
+
+            // Update button states
+            btnViewDatabase.Enabled = databaseTree != null || binaryNavigator != null;
+
+            // Auto-select format if only one is loaded
+            if (databaseTree != null && binaryNavigator == null)
+            {
+                rbUseTree.Checked = true;
+            }
+            else if (binaryNavigator != null && databaseTree == null)
+            {
+                rbUseBlob.Checked = true;
+            }
         }
     }
 }

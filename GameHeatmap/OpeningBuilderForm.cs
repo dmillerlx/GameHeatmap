@@ -44,6 +44,7 @@ namespace GameHeatmap
         private MoveFrequencyTree? theodoreTree;
         private HeatmapBuilder? theodoreHeatmap;  // Store Theodore's heatmap for game metadata
         private MoveFrequencyTree? databaseTree;
+        private BinaryTreeNavigator? databaseBlob;  // NEW: Store blob navigator
         private bool theodorePlaysWhite;
         private PgnGame? mainlineGame;
         private string generatedPgn = "";
@@ -57,6 +58,23 @@ namespace GameHeatmap
             this.theodoreTree = theodoreTree;
             this.theodoreHeatmap = theodoreHeatmap;
             this.databaseTree = databaseTree;
+            this.databaseBlob = null;
+            this.theodorePlaysWhite = theodorePlaysWhite;
+
+            InitializeComponent();
+            LoadSettings();
+            AutoLoadLastPgn();
+
+            // Save settings when form closes
+            this.FormClosing += (s, e) => SaveSettings();
+        }
+
+        public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, BinaryTreeNavigator? databaseBlob, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null)
+        {
+            this.theodoreTree = theodoreTree;
+            this.theodoreHeatmap = theodoreHeatmap;
+            this.databaseTree = null;
+            this.databaseBlob = databaseBlob;  // Store blob, materialize later
             this.theodorePlaysWhite = theodorePlaysWhite;
 
             InitializeComponent();
@@ -597,9 +615,11 @@ namespace GameHeatmap
                 }
 
                 // Check database
-                if (chkUseDatabaseGames.Checked && databaseTree != null)
+                if (chkUseDatabaseGames.Checked && (databaseTree != null || databaseBlob != null))
                 {
-                    var dbMoves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove);
+                    var dbMoves = databaseTree != null
+                        ? FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove)
+                        : FindMovesInBlob(databaseBlob!.RootOffset, moveSequence, isWhiteToMove);
                     movesFromDB.AddRange(dbMoves);
                 }
 
@@ -677,9 +697,11 @@ namespace GameHeatmap
                     }
                     
                     // Check database
-                    if (chkUseDatabaseGames.Checked && databaseTree != null)
+                    if (chkUseDatabaseGames.Checked && (databaseTree != null || databaseBlob != null))
                     {
-                        dbMoves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow);
+                        dbMoves = databaseTree != null
+                            ? FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow)
+                            : FindMovesInBlob(databaseBlob!.RootOffset, moveSequence, isWhiteToMoveNow);
                     }
                     
                     // Combine moves from both sources
@@ -751,9 +773,11 @@ namespace GameHeatmap
                         }
 
                         // Check database
-                        if (chkUseDatabaseGames.Checked && databaseTree != null)
+                        if (chkUseDatabaseGames.Checked && (databaseTree != null || databaseBlob != null))
                         {
-                            var moves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow);
+                            var moves = databaseTree != null
+                                ? FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow)
+                                : FindMovesInBlob(databaseBlob!.RootOffset, moveSequence, isWhiteToMoveNow);
                             foreach (var (san, freq) in moves)
                             {
                                 databaseMoves[san] = freq;
@@ -922,9 +946,11 @@ namespace GameHeatmap
             }
 
             // Get Database moves - apply maxBranches and threshold here
-            if (chkUseDatabaseGames.Checked && databaseTree != null)
+            if (chkUseDatabaseGames.Checked && (databaseTree != null || databaseBlob != null))
             {
-                var moves = FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove);
+                var moves = databaseTree != null
+                    ? FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMove)
+                    : FindMovesInBlob(databaseBlob!.RootOffset, moveSequence, isWhiteToMove);
                 var sortedDbMoves = moves.OrderByDescending(m => m.frequency).ToList();
 
                 if (sortedDbMoves.Count > 0)
@@ -1162,22 +1188,47 @@ namespace GameHeatmap
         private List<(string san, int frequency)> FindMovesInTree(FrequencyNode treeNode, List<string> moveSequence, bool isWhiteToMove)
         {
             var currentNode = treeNode;
-            
+
             foreach (var move in moveSequence)
             {
                 var child = currentNode.Children.Values.FirstOrDefault(c => c.San == move);
                 if (child == null)
                     return new List<(string, int)>();
-                
+
                 currentNode = child;
             }
-            
+
             return currentNode.Children.Values
                 .Where(c => c.IsWhiteMove == isWhiteToMove)
                 .Select(c => (c.San, c.Frequency))
                 .ToList();
         }
-        
+
+        private List<(string san, int frequency)> FindMovesInBlob(int startOffset, List<string> moveSequence, bool isWhiteToMove)
+        {
+            if (databaseBlob == null)
+                return new List<(string, int)>();
+
+            int currentOffset = startOffset;
+
+            // Navigate to the position by following the move sequence
+            foreach (var move in moveSequence)
+            {
+                int childOffset = databaseBlob.FindChild(currentOffset, move);
+                if (childOffset == -1)
+                    return new List<(string, int)>();  // Path doesn't exist
+
+                currentOffset = childOffset;
+            }
+
+            // Get children at this position
+            var children = databaseBlob.GetChildren(currentOffset);
+            return children
+                .Where(c => databaseBlob.IsWhiteMove(c.offset) == isWhiteToMove)
+                .Select(c => (c.san, c.frequency))
+                .ToList();
+        }
+
         private void DisplayTreeInView(MoveNode root)
         {
             var treeRoot = new TreeNode("Opening Repertoire");
@@ -1788,6 +1839,46 @@ namespace GameHeatmap
             generatedPgn = "";
             btnSave.Enabled = false;
             btnCopy.Enabled = false;
+        }
+
+        private MoveFrequencyTree MaterializeTreeFromBlob(BinaryTreeNavigator navigator)
+        {
+            var tree = new MoveFrequencyTree();
+
+            // Recursively materialize the entire tree from blob
+            var rootNode = MaterializeNodeRecursive(navigator, navigator.RootOffset);
+
+            // Use reflection to set the Root property (has private setter)
+            var rootProperty = typeof(MoveFrequencyTree).GetProperty("Root");
+            rootProperty?.SetValue(tree, rootNode);
+
+            // Set total games (use reflection to set private field)
+            var totalGamesField = typeof(MoveFrequencyTree).GetField("totalGamesProcessed",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            totalGamesField?.SetValue(tree, navigator.TotalGames);
+
+            return tree;
+        }
+
+        private FrequencyNode MaterializeNodeRecursive(BinaryTreeNavigator navigator, int nodeOffset)
+        {
+            var node = new FrequencyNode
+            {
+                San = navigator.GetSan(nodeOffset),
+                MoveNumber = navigator.GetMoveNumber(nodeOffset),
+                IsWhiteMove = navigator.IsWhiteMove(nodeOffset),
+                Frequency = navigator.GetFrequency(nodeOffset)
+            };
+
+            // Recursively materialize all children
+            var children = navigator.GetChildren(nodeOffset);
+            foreach (var (san, childOffset, freq) in children)
+            {
+                var childNode = MaterializeNodeRecursive(navigator, childOffset);
+                node.Children[san] = childNode;
+            }
+
+            return node;
         }
     }
 }

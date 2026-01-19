@@ -20,6 +20,9 @@ namespace GameHeatmap
         public int Frequency { get; set; } = 0;
         public Dictionary<string, FrequencyNode> Children { get; set; } = new Dictionary<string, FrequencyNode>();
 
+        // Cache sorted children to avoid re-sorting millions of times
+        internal List<FrequencyNode>? SortedChildrenCache { get; set; }
+
         public FrequencyNode FindOrCreateChild(string san, int moveNumber, bool isWhiteMove)
         {
             if (!Children.ContainsKey(san))
@@ -1075,17 +1078,25 @@ namespace GameHeatmap
         /// <summary>
         /// Save the tree to a binary file for fast loading
         /// </summary>
-        public void SaveToFile(string filePath)
+        public void SaveToFile(string filePath, int maxChunkSizeMB = 1024)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Console.WriteLine($"[SAVE] Starting save to {filePath}");
+            Console.WriteLine($"[SAVE] Max depth: {maxDepth}, Total games: {totalGamesProcessed}");
+            Console.WriteLine($"[SAVE] Chunk size parameter: {maxChunkSizeMB}MB (note: simple binary format doesn't use chunking)");
+
             using (var writer = new BinaryWriter(File.Open(filePath, FileMode.Create)))
             {
                 // Write metadata
                 writer.Write(maxDepth);
                 writer.Write(totalGamesProcessed);
-                
+
                 // Write tree structure
                 WriteNode(writer, Root);
             }
+
+            sw.Stop();
+            Console.WriteLine($"[SAVE] Complete in {sw.ElapsedMilliseconds}ms ({sw.ElapsedMilliseconds/1000.0:F1}s)");
         }
 
         private void WriteNode(BinaryWriter writer, FrequencyNode node)

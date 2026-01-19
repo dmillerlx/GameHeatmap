@@ -11,11 +11,21 @@ namespace GameHeatmap
         private TreeView treeView;
         private Label lblStats;
         private MoveFrequencyTree? freqTree;
+        private BinaryTreeNavigator? blobNavigator;
         private float dpiScale = 1.0f;
 
         public DatabaseTreeForm(MoveFrequencyTree freqTree)
         {
             this.freqTree = freqTree;
+            this.blobNavigator = null;
+            InitializeComponent();
+            BuildTree();
+        }
+
+        public DatabaseTreeForm(BinaryTreeNavigator navigator)
+        {
+            this.freqTree = null;
+            this.blobNavigator = navigator;
             InitializeComponent();
             BuildTree();
         }
@@ -119,25 +129,58 @@ namespace GameHeatmap
         {
             treeView.Nodes.Clear();
 
-            if (freqTree == null || freqTree.Root.Children.Count == 0)
+            if (blobNavigator != null)
+            {
+                // Build tree from blob navigator
+                var rootChildren = blobNavigator.GetChildren(blobNavigator.RootOffset);
+                if (rootChildren.Count == 0)
+                {
+                    treeView.Nodes.Add("No data loaded");
+                    lblStats.Text = "No games processed";
+                    return;
+                }
+
+                var root = new TreeNode($"Database ({blobNavigator.TotalGames:N0} games)");
+                root.Tag = blobNavigator.RootOffset; // Store offset for lazy loading
+
+                // LAZY LOADING: Only populate top-level moves initially
+                PopulateChildrenFromBlob(root, blobNavigator.RootOffset);
+
+                treeView.Nodes.Add(root);
+                root.Expand();
+
+                lblStats.Text = $"Database: {blobNavigator.TotalGames:N0} games | " +
+                              $"Top-level moves: {rootChildren.Count} | " +
+                              $"Blob format - FAST lazy loading";
+            }
+            else if (freqTree != null)
+            {
+                // Build tree from MoveFrequencyTree
+                if (freqTree.Root.Children.Count == 0)
+                {
+                    treeView.Nodes.Add("No data loaded");
+                    lblStats.Text = "No games processed";
+                    return;
+                }
+
+                var root = new TreeNode($"Database ({freqTree.TotalGamesProcessed:N0} games)");
+                root.Tag = freqTree.Root; // Store FrequencyNode for lazy loading
+
+                // LAZY LOADING: Only populate top-level moves initially
+                PopulateChildren(root, freqTree.Root);
+
+                treeView.Nodes.Add(root);
+                root.Expand();
+
+                lblStats.Text = $"Database: {freqTree.TotalGamesProcessed:N0} games | " +
+                              $"Top-level moves: {freqTree.Root.Children.Count} | " +
+                              $"Tree uses LAZY LOADING - expand nodes to see continuations";
+            }
+            else
             {
                 treeView.Nodes.Add("No data loaded");
                 lblStats.Text = "No games processed";
-                return;
             }
-
-            var root = new TreeNode($"Database ({freqTree.TotalGamesProcessed:N0} games)");
-            root.Tag = freqTree.Root; // Store FrequencyNode for lazy loading
-
-            // LAZY LOADING: Only populate top-level moves initially
-            PopulateChildren(root, freqTree.Root);
-
-            treeView.Nodes.Add(root);
-            root.Expand();
-
-            lblStats.Text = $"Database: {freqTree.TotalGamesProcessed:N0} games | " +
-                          $"Top-level moves: {freqTree.Root.Children.Count} | " +
-                          $"Tree uses LAZY LOADING - expand nodes to see continuations";
         }
 
         private void TreeView_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
@@ -151,11 +194,19 @@ namespace GameHeatmap
                 // Remove dummy node
                 e.Node.Nodes.Clear();
 
-                // Populate real children
-                var freqNode = e.Node.Tag as FrequencyNode;
-                if (freqNode != null)
+                if (blobNavigator != null && e.Node.Tag is int offset)
                 {
-                    PopulateChildren(e.Node, freqNode);
+                    // Populate from blob
+                    PopulateChildrenFromBlob(e.Node, offset);
+                }
+                else
+                {
+                    // Populate from tree
+                    var freqNode = e.Node.Tag as FrequencyNode;
+                    if (freqNode != null)
+                    {
+                        PopulateChildren(e.Node, freqNode);
+                    }
                 }
             }
         }
@@ -192,10 +243,74 @@ namespace GameHeatmap
             }
         }
 
+        private void PopulateChildrenFromBlob(TreeNode parentTreeNode, int parentOffset)
+        {
+            if (blobNavigator == null) return;
+
+            var children = blobNavigator.GetChildren(parentOffset);
+            if (children.Count == 0)
+                return;
+
+            // Already sorted by frequency (from blob format)
+            int parentFrequency = blobNavigator.GetFrequency(parentOffset);
+
+            foreach (var (san, childOffset, childFreq) in children)
+            {
+                double percentage = parentFrequency > 0 ? (childFreq * 100.0 / parentFrequency) : 0;
+
+                int moveNum = blobNavigator.GetMoveNumber(childOffset);
+                bool isWhite = blobNavigator.IsWhiteMove(childOffset);
+                string moveNumStr = isWhite ? $"{moveNum}." : $"{moveNum}...";
+                string nodeText = $"{moveNumStr}{san} ({childFreq:N0} = {percentage:F1}%)";
+
+                var treeNode = new TreeNode(nodeText);
+                treeNode.Tag = childOffset; // Store offset for lazy loading
+                ColorCodeNodeFromBlob(treeNode, childOffset, parentOffset);
+
+                // Add dummy node if this child has children (shows + icon)
+                int childCount = blobNavigator.GetChildCount(childOffset);
+                if (childCount > 0)
+                {
+                    treeNode.Nodes.Add(new TreeNode("")); // Empty dummy node
+                }
+
+                parentTreeNode.Nodes.Add(treeNode);
+            }
+        }
+
         private void ColorCodeNode(TreeNode treeNode, FrequencyNode freqNode, FrequencyNode parent)
         {
             int maxFreqAtLevel = parent.Children.Values.Max(c => c.Frequency);
             float intensity = maxFreqAtLevel > 0 ? (float)freqNode.Frequency / maxFreqAtLevel : 0f;
+
+            if (intensity >= 0.8f)
+            {
+                treeNode.ForeColor = Color.Red;
+                treeNode.NodeFont = new Font(treeView.Font, FontStyle.Bold);
+            }
+            else if (intensity >= 0.5f)
+            {
+                treeNode.ForeColor = Color.DarkRed;
+                treeNode.NodeFont = new Font(treeView.Font, FontStyle.Bold);
+            }
+            else if (intensity >= 0.2f)
+            {
+                treeNode.ForeColor = Color.DarkOrange;
+            }
+            else
+            {
+                treeNode.ForeColor = Color.Gray;
+            }
+        }
+
+        private void ColorCodeNodeFromBlob(TreeNode treeNode, int nodeOffset, int parentOffset)
+        {
+            if (blobNavigator == null) return;
+
+            var siblings = blobNavigator.GetChildren(parentOffset);
+            int maxFreq = siblings.Max(s => s.frequency);
+            int nodeFreq = blobNavigator.GetFrequency(nodeOffset);
+            float intensity = maxFreq > 0 ? (float)nodeFreq / maxFreq : 0f;
 
             if (intensity >= 0.8f)
             {
