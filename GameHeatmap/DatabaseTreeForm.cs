@@ -194,7 +194,7 @@ namespace GameHeatmap
                 // Remove dummy node
                 e.Node.Nodes.Clear();
 
-                if (blobNavigator != null && e.Node.Tag is int offset)
+                if (blobNavigator != null && e.Node.Tag is long offset)
                 {
                     // Populate from blob
                     PopulateChildrenFromBlob(e.Node, offset);
@@ -243,7 +243,7 @@ namespace GameHeatmap
             }
         }
 
-        private void PopulateChildrenFromBlob(TreeNode parentTreeNode, int parentOffset)
+        private void PopulateChildrenFromBlob(TreeNode parentTreeNode, long parentOffset)
         {
             if (blobNavigator == null) return;
 
@@ -303,7 +303,7 @@ namespace GameHeatmap
             }
         }
 
-        private void ColorCodeNodeFromBlob(TreeNode treeNode, int nodeOffset, int parentOffset)
+        private void ColorCodeNodeFromBlob(TreeNode treeNode, long nodeOffset, long parentOffset)
         {
             if (blobNavigator == null) return;
 

@@ -1605,7 +1605,7 @@ namespace GameHeatmap
             return tree;
         }
 
-        private FrequencyNode MaterializeNodeRecursive(BinaryTreeNavigator navigator, int nodeOffset)
+        private FrequencyNode MaterializeNodeRecursive(BinaryTreeNavigator navigator, long nodeOffset)
         {
             var node = new FrequencyNode
             {
@@ -2209,15 +2209,6 @@ namespace GameHeatmap
                     progressForm.Controls.Add(lblProgress);
 
                     progressForm.Show(this);
-
-                    // Force Gen 2 garbage collection before starting to free up memory
-                    lblStatus.Text = "Performing garbage collection...";
-                    Application.DoEvents();
-                    GC.Collect(2, GCCollectionMode.Forced, true, true);
-                    GC.WaitForPendingFinalizers();
-                    GC.Collect(2, GCCollectionMode.Forced, true, true);
-                    lblStatus.Text = "Building blob format...";
-                    Application.DoEvents();
 
                     var progress = new Progress<(int nodesWritten, int totalNodes)>(update =>
                     {

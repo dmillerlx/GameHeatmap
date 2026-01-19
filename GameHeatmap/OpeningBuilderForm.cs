@@ -1204,17 +1204,17 @@ namespace GameHeatmap
                 .ToList();
         }
 
-        private List<(string san, int frequency)> FindMovesInBlob(int startOffset, List<string> moveSequence, bool isWhiteToMove)
+        private List<(string san, int frequency)> FindMovesInBlob(long startOffset, List<string> moveSequence, bool isWhiteToMove)
         {
             if (databaseBlob == null)
                 return new List<(string, int)>();
 
-            int currentOffset = startOffset;
+            long currentOffset = startOffset;
 
             // Navigate to the position by following the move sequence
             foreach (var move in moveSequence)
             {
-                int childOffset = databaseBlob.FindChild(currentOffset, move);
+                long childOffset = databaseBlob.FindChild(currentOffset, move);
                 if (childOffset == -1)
                     return new List<(string, int)>();  // Path doesn't exist
 
@@ -1860,7 +1860,7 @@ namespace GameHeatmap
             return tree;
         }
 
-        private FrequencyNode MaterializeNodeRecursive(BinaryTreeNavigator navigator, int nodeOffset)
+        private FrequencyNode MaterializeNodeRecursive(BinaryTreeNavigator navigator, long nodeOffset)
         {
             var node = new FrequencyNode
             {
