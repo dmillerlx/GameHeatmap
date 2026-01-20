@@ -726,13 +726,205 @@ namespace GameHeatmap
         {
             try
             {
-                binaryNavigator = new BinaryTreeNavigator();
-                binaryNavigator.Load(filePath);
+                // Fancy progress dialog
+                Form progressForm = new Form
+                {
+                    Text = "Loading Chess Database",
+                    Size = new Size(Scale(550), Scale(250)),
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    StartPosition = FormStartPosition.CenterScreen,
+                    MaximizeBox = false,
+                    MinimizeBox = false,
+                    TopMost = true,
+                    BackColor = System.Drawing.Color.White
+                };
 
+                Label lblTitle = new Label
+                {
+                    Text = "📂 Loading Blob Database",
+                    Location = new Point(Scale(20), Scale(15)),
+                    Size = new Size(Scale(510), Scale(25)),
+                    Font = new Font(this.Font.FontFamily, Scale(12), FontStyle.Bold),
+                    AutoSize = false
+                };
+                progressForm.Controls.Add(lblTitle);
+
+                Label lblFile = new Label
+                {
+                    Text = "Initializing...",
+                    Location = new Point(Scale(20), Scale(50)),
+                    Size = new Size(Scale(510), Scale(20)),
+                    ForeColor = System.Drawing.Color.DarkBlue,
+                    AutoSize = false
+                };
+                progressForm.Controls.Add(lblFile);
+
+                Label lblProgress = new Label
+                {
+                    Text = "0 MB / 0 MB (0%)",
+                    Location = new Point(Scale(20), Scale(75)),
+                    Size = new Size(Scale(510), Scale(20)),
+                    AutoSize = false
+                };
+                progressForm.Controls.Add(lblProgress);
+
+                ProgressBar progressBar = new ProgressBar
+                {
+                    Location = new Point(Scale(20), Scale(100)),
+                    Size = new Size(Scale(510), Scale(30)),
+                    Style = ProgressBarStyle.Continuous,
+                    Minimum = 0,
+                    Maximum = 100
+                };
+                progressForm.Controls.Add(progressBar);
+
+                Label lblSpeed = new Label
+                {
+                    Text = "Speed: -- MB/s",
+                    Location = new Point(Scale(20), Scale(140)),
+                    Size = new Size(Scale(250), Scale(20)),
+                    ForeColor = System.Drawing.Color.DarkGreen,
+                    AutoSize = false
+                };
+                progressForm.Controls.Add(lblSpeed);
+
+                Label lblEta = new Label
+                {
+                    Text = "Time remaining: --",
+                    Location = new Point(Scale(280), Scale(140)),
+                    Size = new Size(Scale(250), Scale(20)),
+                    ForeColor = System.Drawing.Color.DarkOrange,
+                    AutoSize = false
+                };
+                progressForm.Controls.Add(lblEta);
+
+                Label lblChunks = new Label
+                {
+                    Text = "Chunk: 0 / 0",
+                    Location = new Point(Scale(20), Scale(165)),
+                    Size = new Size(Scale(510), Scale(20)),
+                    ForeColor = System.Drawing.Color.Gray,
+                    AutoSize = false
+                };
+                progressForm.Controls.Add(lblChunks);
+
+                progressForm.Show();
+                Application.DoEvents();
+
+                var startTime = DateTime.Now;
+                BinaryTreeNavigator? loadedNavigator = null;
+                Exception? loadException = null;
+                long lastBytesRead = 0;
+                DateTime lastUpdateTime = DateTime.Now;
+
+                var progress = new Progress<(long bytesRead, long totalBytes, int currentChunk, int totalChunks)>(p =>
+                {
+                    try
+                    {
+                        if (progressForm.IsDisposed)
+                            return;
+
+                        if (progressForm.InvokeRequired)
+                        {
+                            progressForm.Invoke(() =>
+                            {
+                                if (progressForm.IsDisposed)
+                                    return;
+
+                                double mbRead = p.bytesRead / (1024.0 * 1024.0);
+                                double mbTotal = p.totalBytes / (1024.0 * 1024.0);
+                                int percentage = p.totalBytes > 0 ? (int)((p.bytesRead * 100) / p.totalBytes) : 0;
+
+                                // Calculate speed
+                                var elapsed = DateTime.Now - startTime;
+                                double speed = elapsed.TotalSeconds > 0 ? mbRead / elapsed.TotalSeconds : 0;
+
+                                // Calculate ETA
+                                double remainingMB = mbTotal - mbRead;
+                                double etaSeconds = speed > 0 ? remainingMB / speed : 0;
+                                string etaText = etaSeconds > 0 && etaSeconds < 3600
+                                    ? $"{TimeSpan.FromSeconds(etaSeconds):mm\\:ss}"
+                                    : "--";
+
+                                // Update UI
+                                string baseName = Path.GetFileNameWithoutExtension(filePath.Replace(".0", ""));
+                                lblFile.Text = $"📊 Loading: {baseName}.blob (chunk {p.currentChunk}/{p.totalChunks})";
+                                lblProgress.Text = $"{mbRead:F1} MB / {mbTotal:F1} MB ({percentage}%)";
+                                lblSpeed.Text = $"⚡ Speed: {speed:F1} MB/s";
+                                lblEta.Text = $"⏱️ Time remaining: {etaText}";
+                                lblChunks.Text = $"📦 Processing chunk {p.currentChunk} of {p.totalChunks}";
+                                progressBar.Value = Math.Min(percentage, 100);
+
+                                lastBytesRead = p.bytesRead;
+                                lastUpdateTime = DateTime.Now;
+                            });
+                        }
+                        else
+                        {
+                            double mbRead = p.bytesRead / (1024.0 * 1024.0);
+                            double mbTotal = p.totalBytes / (1024.0 * 1024.0);
+                            int percentage = p.totalBytes > 0 ? (int)((p.bytesRead * 100) / p.totalBytes) : 0;
+
+                            // Calculate speed
+                            var elapsed = DateTime.Now - startTime;
+                            double speed = elapsed.TotalSeconds > 0 ? mbRead / elapsed.TotalSeconds : 0;
+
+                            // Calculate ETA
+                            double remainingMB = mbTotal - mbRead;
+                            double etaSeconds = speed > 0 ? remainingMB / speed : 0;
+                            string etaText = etaSeconds > 0 && etaSeconds < 3600
+                                ? $"{TimeSpan.FromSeconds(etaSeconds):mm\\:ss}"
+                                : "--";
+
+                            // Update UI
+                            string baseName = Path.GetFileNameWithoutExtension(filePath.Replace(".0", ""));
+                            lblFile.Text = $"📊 Loading: {baseName}.blob (chunk {p.currentChunk}/{p.totalChunks})";
+                            lblProgress.Text = $"{mbRead:F1} MB / {mbTotal:F1} MB ({percentage}%)";
+                            lblSpeed.Text = $"⚡ Speed: {speed:F1} MB/s";
+                            lblEta.Text = $"⏱️ Time remaining: {etaText}";
+                            lblChunks.Text = $"📦 Processing chunk {p.currentChunk} of {p.totalChunks}";
+                            progressBar.Value = Math.Min(percentage, 100);
+                        }
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Form was closed/disposed, ignore
+                    }
+                });
+
+                var loadTask = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try
+                    {
+                        loadedNavigator = new BinaryTreeNavigator();
+                        loadedNavigator.Load(filePath, progress);
+                    }
+                    catch (Exception ex)
+                    {
+                        loadException = ex;
+                    }
+                });
+
+                while (!loadTask.IsCompleted)
+                {
+                    Application.DoEvents();
+                    System.Threading.Thread.Sleep(50);
+                }
+
+                var elapsed = DateTime.Now - startTime;
+                progressForm.Close();
+
+                if (loadException != null)
+                {
+                    // Silently fail on startup - user can manually load later
+                    return;
+                }
+
+                binaryNavigator = loadedNavigator;
                 btnUnloadBlob.Enabled = true;
                 btnViewDatabase.Enabled = true;
                 UpdateStatusLabels();
-                lblStatus.Text = $"Auto-loaded blob: {binaryNavigator.TotalGames:N0} games";
+                lblStatus.Text = $"Auto-loaded blob: {binaryNavigator.TotalGames:N0} games ({elapsed.TotalSeconds:F1}s)";
             }
             catch (Exception)
             {
@@ -2268,45 +2460,176 @@ namespace GameHeatmap
             {
                 try
                 {
-                    // Progress dialog
+                    // Fancy progress dialog
                     Form progressForm = new Form
                     {
-                        Text = "Loading Blob",
-                        Size = new Size(Scale(400), Scale(150)),
+                        Text = "Loading Chess Database",
+                        Size = new Size(Scale(550), Scale(250)),
                         FormBorderStyle = FormBorderStyle.FixedDialog,
-                        StartPosition = FormStartPosition.CenterParent,
+                        StartPosition = FormStartPosition.CenterScreen,
                         MaximizeBox = false,
-                        MinimizeBox = false
+                        MinimizeBox = false,
+                        BackColor = System.Drawing.Color.White
                     };
 
-                    Label lblStatus = new Label
+                    Label lblTitle = new Label
                     {
-                        Text = "Loading blob file...",
-                        Location = new Point(Scale(20), Scale(20)),
-                        Size = new Size(Scale(360), Scale(20))
+                        Text = "📂 Loading Blob Database",
+                        Location = new Point(Scale(20), Scale(15)),
+                        Size = new Size(Scale(510), Scale(25)),
+                        Font = new Font(this.Font.FontFamily, Scale(12), FontStyle.Bold),
+                        AutoSize = false
                     };
-                    progressForm.Controls.Add(lblStatus);
+                    progressForm.Controls.Add(lblTitle);
+
+                    Label lblFile = new Label
+                    {
+                        Text = "Initializing...",
+                        Location = new Point(Scale(20), Scale(50)),
+                        Size = new Size(Scale(510), Scale(20)),
+                        ForeColor = System.Drawing.Color.DarkBlue,
+                        AutoSize = false
+                    };
+                    progressForm.Controls.Add(lblFile);
+
+                    Label lblProgress = new Label
+                    {
+                        Text = "0 MB / 0 MB (0%)",
+                        Location = new Point(Scale(20), Scale(75)),
+                        Size = new Size(Scale(510), Scale(20)),
+                        AutoSize = false
+                    };
+                    progressForm.Controls.Add(lblProgress);
 
                     ProgressBar progressBar = new ProgressBar
                     {
-                        Location = new Point(Scale(20), Scale(50)),
-                        Size = new Size(Scale(360), Scale(25)),
-                        Style = ProgressBarStyle.Marquee
+                        Location = new Point(Scale(20), Scale(100)),
+                        Size = new Size(Scale(510), Scale(30)),
+                        Style = ProgressBarStyle.Continuous,
+                        Minimum = 0,
+                        Maximum = 100
                     };
                     progressForm.Controls.Add(progressBar);
+
+                    Label lblSpeed = new Label
+                    {
+                        Text = "Speed: -- MB/s",
+                        Location = new Point(Scale(20), Scale(140)),
+                        Size = new Size(Scale(250), Scale(20)),
+                        ForeColor = System.Drawing.Color.DarkGreen,
+                        AutoSize = false
+                    };
+                    progressForm.Controls.Add(lblSpeed);
+
+                    Label lblEta = new Label
+                    {
+                        Text = "Time remaining: --",
+                        Location = new Point(Scale(280), Scale(140)),
+                        Size = new Size(Scale(250), Scale(20)),
+                        ForeColor = System.Drawing.Color.DarkOrange,
+                        AutoSize = false
+                    };
+                    progressForm.Controls.Add(lblEta);
+
+                    Label lblChunks = new Label
+                    {
+                        Text = "Chunk: 0 / 0",
+                        Location = new Point(Scale(20), Scale(165)),
+                        Size = new Size(Scale(510), Scale(20)),
+                        ForeColor = System.Drawing.Color.Gray,
+                        AutoSize = false
+                    };
+                    progressForm.Controls.Add(lblChunks);
 
                     progressForm.Show(this);
 
                     var startTime = DateTime.Now;
                     BinaryTreeNavigator? loadedNavigator = null;
                     Exception? loadException = null;
+                    long lastBytesRead = 0;
+                    DateTime lastUpdateTime = DateTime.Now;
+
+                    var progress = new Progress<(long bytesRead, long totalBytes, int currentChunk, int totalChunks)>(p =>
+                    {
+                        try
+                        {
+                            if (progressForm.IsDisposed)
+                                return;
+
+                            if (progressForm.InvokeRequired)
+                            {
+                                progressForm.Invoke(() =>
+                                {
+                                    if (progressForm.IsDisposed)
+                                        return;
+
+                                    double mbRead = p.bytesRead / (1024.0 * 1024.0);
+                                    double mbTotal = p.totalBytes / (1024.0 * 1024.0);
+                                    int percentage = p.totalBytes > 0 ? (int)((p.bytesRead * 100) / p.totalBytes) : 0;
+
+                                    // Calculate speed
+                                    var elapsed = DateTime.Now - startTime;
+                                    double speed = elapsed.TotalSeconds > 0 ? mbRead / elapsed.TotalSeconds : 0;
+
+                                    // Calculate ETA
+                                    double remainingMB = mbTotal - mbRead;
+                                    double etaSeconds = speed > 0 ? remainingMB / speed : 0;
+                                    string etaText = etaSeconds > 0 && etaSeconds < 3600
+                                        ? $"{TimeSpan.FromSeconds(etaSeconds):mm\\:ss}"
+                                        : "--";
+
+                                    // Update UI
+                                    string baseName = Path.GetFileNameWithoutExtension(ofd.FileName.Replace(".0", ""));
+                                    lblFile.Text = $"📊 Loading: {baseName}.blob (chunk {p.currentChunk}/{p.totalChunks})";
+                                    lblProgress.Text = $"{mbRead:F1} MB / {mbTotal:F1} MB ({percentage}%)";
+                                    lblSpeed.Text = $"⚡ Speed: {speed:F1} MB/s";
+                                    lblEta.Text = $"⏱️ Time remaining: {etaText}";
+                                    lblChunks.Text = $"📦 Processing chunk {p.currentChunk} of {p.totalChunks}";
+                                    progressBar.Value = Math.Min(percentage, 100);
+
+                                    lastBytesRead = p.bytesRead;
+                                    lastUpdateTime = DateTime.Now;
+                                });
+                            }
+                            else
+                            {
+                                double mbRead = p.bytesRead / (1024.0 * 1024.0);
+                                double mbTotal = p.totalBytes / (1024.0 * 1024.0);
+                                int percentage = p.totalBytes > 0 ? (int)((p.bytesRead * 100) / p.totalBytes) : 0;
+
+                                // Calculate speed
+                                var elapsed = DateTime.Now - startTime;
+                                double speed = elapsed.TotalSeconds > 0 ? mbRead / elapsed.TotalSeconds : 0;
+
+                                // Calculate ETA
+                                double remainingMB = mbTotal - mbRead;
+                                double etaSeconds = speed > 0 ? remainingMB / speed : 0;
+                                string etaText = etaSeconds > 0 && etaSeconds < 3600
+                                    ? $"{TimeSpan.FromSeconds(etaSeconds):mm\\:ss}"
+                                    : "--";
+
+                                // Update UI
+                                string baseName = Path.GetFileNameWithoutExtension(ofd.FileName.Replace(".0", ""));
+                                lblFile.Text = $"📊 Loading: {baseName}.blob (chunk {p.currentChunk}/{p.totalChunks})";
+                                lblProgress.Text = $"{mbRead:F1} MB / {mbTotal:F1} MB ({percentage}%)";
+                                lblSpeed.Text = $"⚡ Speed: {speed:F1} MB/s";
+                                lblEta.Text = $"⏱️ Time remaining: {etaText}";
+                                lblChunks.Text = $"📦 Processing chunk {p.currentChunk} of {p.totalChunks}";
+                                progressBar.Value = Math.Min(percentage, 100);
+                            }
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            // Form was closed/disposed, ignore
+                        }
+                    });
 
                     var loadTask = System.Threading.Tasks.Task.Run(() =>
                     {
                         try
                         {
                             loadedNavigator = new BinaryTreeNavigator();
-                            loadedNavigator.Load(ofd.FileName);
+                            loadedNavigator.Load(ofd.FileName, progress);
                         }
                         catch (Exception ex)
                         {
@@ -2317,7 +2640,7 @@ namespace GameHeatmap
                     while (!loadTask.IsCompleted)
                     {
                         Application.DoEvents();
-                        System.Threading.Thread.Sleep(100);
+                        System.Threading.Thread.Sleep(50);
                     }
 
                     var elapsed = DateTime.Now - startTime;

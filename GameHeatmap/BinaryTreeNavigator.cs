@@ -24,7 +24,7 @@ namespace GameHeatmap
         /// <summary>
         /// Load binary blob from multi-file format (fast - just reads bytes)
         /// </summary>
-        public void Load(string filePath, IProgress<(long bytesRead, long totalBytes)>? progress = null)
+        public void Load(string filePath, IProgress<(long bytesRead, long totalBytes, int currentChunk, int totalChunks)>? progress = null)
         {
             // Ensure this is multi-file format (ends with .0)
             if (!filePath.EndsWith(".0"))
@@ -35,7 +35,7 @@ namespace GameHeatmap
             LoadMultiFile(filePath, progress);
         }
 
-        private void LoadMultiFile(string firstChunkPath, IProgress<(long bytesRead, long totalBytes)>? progress)
+        private void LoadMultiFile(string firstChunkPath, IProgress<(long bytesRead, long totalBytes, int currentChunk, int totalChunks)>? progress)
         {
             chunks = new List<byte[]>();
 
@@ -47,11 +47,13 @@ namespace GameHeatmap
             long totalBytesRead = 0;
             long totalBytes = 0;
 
-            // First pass: calculate total size
+            // First pass: calculate total size and count chunks
+            int totalChunks = 0;
             while (File.Exists($"{basePath}.{chunkIndex}"))
             {
                 totalBytes += new FileInfo($"{basePath}.{chunkIndex}").Length;
                 chunkIndex++;
+                totalChunks++;
             }
 
             // Second pass: load chunks
@@ -61,8 +63,8 @@ namespace GameHeatmap
                 byte[] chunk = File.ReadAllBytes($"{basePath}.{chunkIndex}");
                 chunks.Add(chunk);
                 totalBytesRead += chunk.Length;
-                progress?.Report((totalBytesRead, totalBytes));
                 chunkIndex++;
+                progress?.Report((totalBytesRead, totalBytes, chunkIndex, totalChunks));
             }
 
             if (chunks.Count == 0)
