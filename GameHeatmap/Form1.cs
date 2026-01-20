@@ -28,20 +28,24 @@ namespace GameHeatmap
         private ToolTip toolTip = null!;
         private CheckBox chkShowTooltips = null!;
         private bool showTooltips = true;
-        
+        private Button btnSetPlayerName = null!;
+        private Label lblPlayerName = null!;
+        private Label lblColorFilter = null!;
+        private string playerName = "Theodore";
+
         // Database frequency tree
         private MoveFrequencyTree? databaseTree = null;
-        private Button btnLoadDatabase = null!;
+        private ToolStripMenuItem mnuLoadDatabase = null!;
+        private ToolStripMenuItem mnuLoadTreeCache = null!;
+        private ToolStripMenuItem mnuSaveTreeCache = null!;
+        private ToolStripMenuItem mnuUnloadTree = null!;
         private Button btnViewDatabase = null!;
-        private Button btnSaveDatabase = null!;
-        private Button btnLoadCachedDatabase = null!;
 
         // Binary blob navigator (new fast format)
         private BinaryTreeNavigator? binaryNavigator = null;
-        private Button btnSaveBlob = null!;
-        private Button btnLoadBlob = null!;
-        private Button btnUnloadTree = null!;
-        private Button btnUnloadBlob = null!;
+        private ToolStripMenuItem mnuLoadBlob = null!;
+        private ToolStripMenuItem mnuSaveBlob = null!;
+        private ToolStripMenuItem mnuUnloadBlob = null!;
         private RadioButton rbUseTree = null!;
         private RadioButton rbUseBlob = null!;
         private Label lblTreeStatus = null!;
@@ -65,8 +69,8 @@ namespace GameHeatmap
                 dpiScale = g.DpiX / 96f; // 96 DPI is 100% scaling
             }
 
-            this.Text = "Chess Game Heatmap - Theodore's Games";
-            this.Size = new Size(Scale(1200), Scale(800));
+            this.Text = $"Chess Game Heatmap - {playerName}'s Games";
+            this.Size = new Size(Scale(1200), Scale(1050));
             this.AllowDrop = true;
 
             toolTip = new ToolTip();
@@ -77,401 +81,474 @@ namespace GameHeatmap
             Panel leftPanel = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = Scale(320),
-                Padding = new Padding(Scale(10))
-            };
-
-            int yPos = Scale(10);
-
-            // Player filter
-            Label lblPlayerFilterLabel = new Label
-            {
-                Text = "Player Filter (comma-separated):",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(20))
-            };
-            leftPanel.Controls.Add(lblPlayerFilterLabel);
-            yPos += Scale(25);
-
-            txtPlayerFilter = new TextBox
-            {
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(25)),
-                PlaceholderText = "Theodore, !bot (use ! to exclude)"
-            };
-            leftPanel.Controls.Add(txtPlayerFilter);
-            yPos += Scale(35);
-
-            // Color selection
-            Label lblColorLabel = new Label
-            {
-                Text = "Theodore plays as:",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(20))
-            };
-            leftPanel.Controls.Add(lblColorLabel);
-            yPos += Scale(25);
-
-            rbWhite = new RadioButton
-            {
-                Text = "White",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(100), Scale(25)),
-                Checked = true
-            };
-            leftPanel.Controls.Add(rbWhite);
-
-            rbBlack = new RadioButton
-            {
-                Text = "Black",
-                Location = new Point(Scale(120), yPos),
-                Size = new Size(Scale(100), Scale(25))
-            };
-            leftPanel.Controls.Add(rbBlack);
-            yPos += Scale(35);
-
-            // Depth filter
-            lblDepth = new Label
-            {
-                Text = "Max Depth (moves):",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(150), Scale(20))
-            };
-            leftPanel.Controls.Add(lblDepth);
-
-            numDepth = new NumericUpDown
-            {
-                Location = new Point(Scale(170), yPos - Scale(2)),
-                Size = new Size(Scale(140), Scale(25)),
-                Minimum = 1,
-                Maximum = 200,
-                Value = 50
-            };
-            leftPanel.Controls.Add(numDepth);
-            yPos += Scale(35);
-
-            // Apply filter button
-            btnApplyFilter = new Button
-            {
-                Text = "Apply Filter",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(35)),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-            btnApplyFilter.Click += BtnApplyFilter_Click;
-            leftPanel.Controls.Add(btnApplyFilter);
-            yPos += Scale(45);
-
-            // Load files button
-            btnLoadFiles = new Button
-            {
-                Text = "Load PGN Files",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(30))
-            };
-            btnLoadFiles.Click += BtnLoadFiles_Click;
-            leftPanel.Controls.Add(btnLoadFiles);
-            yPos += Scale(35);
-
-            // Database buttons
-            btnLoadDatabase = new Button
-            {
-                Text = "Load Database",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.LightYellow
-            };
-            btnLoadDatabase.Click += BtnLoadDatabase_Click;
-            leftPanel.Controls.Add(btnLoadDatabase);
-
-            btnViewDatabase = new Button
-            {
-                Text = "View Database",
-                Location = new Point(Scale(165), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.LightGreen,
-                Enabled = false
-            };
-            btnViewDatabase.Click += BtnViewDatabase_Click;
-            leftPanel.Controls.Add(btnViewDatabase);
-            yPos += Scale(35);
-
-            // Save/Load cache buttons
-            btnSaveDatabase = new Button
-            {
-                Text = "Save Cache",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.LightCyan,
-                Enabled = false
-            };
-            btnSaveDatabase.Click += BtnSaveDatabase_Click;
-            leftPanel.Controls.Add(btnSaveDatabase);
-
-            btnLoadCachedDatabase = new Button
-            {
-                Text = "Load Cache",
-                Location = new Point(Scale(165), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.LightSalmon
-            };
-            btnLoadCachedDatabase.Click += BtnLoadCachedDatabase_Click;
-            leftPanel.Controls.Add(btnLoadCachedDatabase);
-            yPos += Scale(35);
-
-            // Unload buttons
-            btnUnloadTree = new Button
-            {
-                Text = "Unload Tree",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.MistyRose,
-                Enabled = false
-            };
-            btnUnloadTree.Click += BtnUnloadTree_Click;
-            leftPanel.Controls.Add(btnUnloadTree);
-
-            btnUnloadBlob = new Button
-            {
-                Text = "Unload Blob",
-                Location = new Point(Scale(165), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.MistyRose,
-                Enabled = false
-            };
-            btnUnloadBlob.Click += BtnUnloadBlob_Click;
-            leftPanel.Controls.Add(btnUnloadBlob);
-            yPos += Scale(35);
-
-            // Blob buttons
-            btnSaveBlob = new Button
-            {
-                Text = "Save Blob",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.LightSteelBlue,
-                Enabled = false
-            };
-            btnSaveBlob.Click += BtnSaveBlob_Click;
-            leftPanel.Controls.Add(btnSaveBlob);
-
-            btnLoadBlob = new Button
-            {
-                Text = "Load Blob",
-                Location = new Point(Scale(165), yPos),
-                Size = new Size(Scale(145), Scale(30)),
-                BackColor = Color.LightSkyBlue
-            };
-            btnLoadBlob.Click += BtnLoadBlob_Click;
-            leftPanel.Controls.Add(btnLoadBlob);
-            yPos += Scale(35);
-
-            // Format selection radio buttons
-            Label lblFormatLabel = new Label
-            {
-                Text = "Query Source:",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(20))
-            };
-            leftPanel.Controls.Add(lblFormatLabel);
-            yPos += Scale(22);
-
-            rbUseTree = new RadioButton
-            {
-                Text = "Tree (mutable)",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(145), Scale(22)),
-                Checked = true
-            };
-            rbUseTree.CheckedChanged += RbFormat_CheckedChanged;
-            leftPanel.Controls.Add(rbUseTree);
-
-            rbUseBlob = new RadioButton
-            {
-                Text = "Blob (fast)",
-                Location = new Point(Scale(165), yPos),
-                Size = new Size(Scale(145), Scale(22))
-            };
-            rbUseBlob.CheckedChanged += RbFormat_CheckedChanged;
-            leftPanel.Controls.Add(rbUseBlob);
-            yPos += Scale(27);
-
-            // Status labels
-            lblTreeStatus = new Label
-            {
-                Text = "Tree: Not loaded",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(20)),
-                ForeColor = Color.Gray
-            };
-            leftPanel.Controls.Add(lblTreeStatus);
-            yPos += Scale(22);
-
-            lblBlobStatus = new Label
-            {
-                Text = "Blob: Not loaded",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(20)),
-                ForeColor = Color.Gray
-            };
-            leftPanel.Controls.Add(lblBlobStatus);
-            yPos += Scale(40);
-
-            // Opening Builder button
-            Button btnOpeningBuilder = new Button
-            {
-                Text = "Opening Builder",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(35)),
-                BackColor = Color.LightGoldenrodYellow,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-            btnOpeningBuilder.Click += BtnOpeningBuilder_Click;
-            leftPanel.Controls.Add(btnOpeningBuilder);
-            yPos += Scale(40);
-
-            // Games list
-            Label lblGamesLabel = new Label
-            {
-                Text = "Loaded Games (multi-select):",
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(20))
-            };
-            leftPanel.Controls.Add(lblGamesLabel);
-            yPos += Scale(25);
-
-            lstGames = new ListBox
-            {
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(400)),
-                SelectionMode = SelectionMode.MultiExtended,
-                Font = new Font("Consolas", 8),
-                IntegralHeight = false
-            };
-            lstGames.SelectedIndexChanged += LstGames_SelectedIndexChanged;
-            lstGames.KeyDown += LstGames_KeyDown;
-            leftPanel.Controls.Add(lstGames);
-            yPos += Scale(410);
-
-            // Status label
-            lblStatus = new Label
-            {
-                Location = new Point(Scale(10), yPos),
-                Size = new Size(Scale(300), Scale(60)),
-                Text = "No games loaded"
-            };
-            leftPanel.Controls.Add(lblStatus);
-
-            // Right panel for tree (ADD FIRST - Fill takes remaining space)
-            Panel rightPanel = new Panel
-            {
-                Dock = DockStyle.Fill
-            };
-
-            // TreeView - ADD FIRST so it fills remaining space
-            treeView = new TreeView
-            {
-                Dock = DockStyle.Fill,
-                Font = new Font("Consolas", 10),
-                HideSelection = false,
-                ShowLines = true,
-                ShowPlusMinus = true,
-                ShowRootLines = true,
-                Scrollable = true
-            };
-            treeView.NodeMouseClick += TreeView_NodeMouseClick;
-            treeView.NodeMouseDoubleClick += TreeView_NodeMouseDoubleClick;
-            rightPanel.Controls.Add(treeView);
-
-            // Top control panel for tree - ADD SECOND so it docks at top
-            Panel treeControlPanel = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = Scale(80),
+                Width = Scale(340),
+                AutoScroll = true,
                 Padding = new Padding(Scale(5))
             };
 
-            // Stats label
-            lblStats = new Label
-            {
-                Text = "Tree View",
-                Location = new Point(Scale(5), Scale(5)),
-                Size = new Size(Scale(800), Scale(25)),
-                Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
-            treeControlPanel.Controls.Add(lblStats);
+            int yPos = Scale(5);
 
-            // Legend label
-            Label lblLegend = new Label
-            {
-                Text = "Colors: Bold Red (80%+) | Dark Red (50-79%) | Orange (20-49%) | Gray (<20%)  |  Format: Move (games/total = %)",
-                Location = new Point(Scale(5), Scale(33)),
-                Size = new Size(Scale(800), Scale(20)),
-                Font = new Font("Segoe UI", 9),
-                ForeColor = Color.DarkSlateGray,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
-            treeControlPanel.Controls.Add(lblLegend);
+    // ========== GROUP 1: Game Settings ==========
+    GroupBox grpGameSettings = new GroupBox
+    {
+        Text = "Game Settings",
+        Location = new Point(Scale(5), yPos),
+        Size = new Size(Scale(310), Scale(285)),
+        Font = new Font("Segoe UI", 9, FontStyle.Bold)
+    };
 
-            // Expand/Collapse buttons
-            Button btnExpandAll = new Button
-            {
-                Text = "Expand All",
-                Location = new Point(Scale(5), Scale(55)),
-                Size = new Size(Scale(100), Scale(25))
-            };
-            btnExpandAll.Click += (s, e) => treeView.ExpandAll();
-            treeControlPanel.Controls.Add(btnExpandAll);
+    // Player name label and button
+    lblPlayerName = new Label
+    {
+        Text = $"Player: {playerName}",
+        Location = new Point(Scale(10), Scale(22)),
+        Size = new Size(Scale(160), Scale(20)),
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    grpGameSettings.Controls.Add(lblPlayerName);
 
-            Button btnCollapseAll = new Button
-            {
-                Text = "Collapse All",
-                Location = new Point(Scale(115), Scale(55)),
-                Size = new Size(Scale(100), Scale(25))
-            };
-            btnCollapseAll.Click += (s, e) => treeView.CollapseAll();
-            treeControlPanel.Controls.Add(btnCollapseAll);
+    btnSetPlayerName = new Button
+    {
+        Text = "Set Player Name...",
+        Location = new Point(Scale(175), Scale(18)),
+        Size = new Size(Scale(125), Scale(25)),
+        Font = new Font("Segoe UI", 8, FontStyle.Regular)
+    };
+    btnSetPlayerName.Click += BtnSetPlayerName_Click;
+    grpGameSettings.Controls.Add(btnSetPlayerName);
 
-            // Show tooltips checkbox
-            chkShowTooltips = new CheckBox
-            {
-                Text = "Show Tooltips",
-                Location = new Point(Scale(225), Scale(57)),
-                Size = new Size(Scale(120), Scale(25)),
-                Checked = true
-            };
-            chkShowTooltips.CheckedChanged += (s, e) => { showTooltips = chkShowTooltips.Checked; };
-            treeControlPanel.Controls.Add(chkShowTooltips);
+    // Load PGN files button (moved up for better flow)
+    btnLoadFiles = new Button
+    {
+        Text = $"Load {playerName}'s PGN Files",
+        Location = new Point(Scale(10), Scale(50)),
+        Size = new Size(Scale(290), Scale(30)),
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        BackColor = Color.LightBlue
+    };
+    btnLoadFiles.Click += BtnLoadFiles_Click;
+    grpGameSettings.Controls.Add(btnLoadFiles);
 
-            rightPanel.Controls.Add(treeControlPanel);
+    // Nested GroupBox for filters
+    GroupBox grpFilters = new GroupBox
+    {
+        Text = "Filters",
+        Location = new Point(Scale(10), Scale(88)),
+        Size = new Size(Scale(290), Scale(160)),
+        Font = new Font("Segoe UI", 8, FontStyle.Bold)
+    };
 
-            // Add in reverse Z-order: Fill first, then splitter, then Left
-            this.Controls.Add(rightPanel);
+    // Player filter
+    Label lblPlayerFilter = new Label
+    {
+        Text = "Player names (comma-separated):",
+        Location = new Point(Scale(8), Scale(18)),
+        Size = new Size(Scale(270), Scale(16)),
+        Font = new Font("Segoe UI", 8, FontStyle.Regular)
+    };
+    grpFilters.Controls.Add(lblPlayerFilter);
 
-            // Add a splitter for resizing
-            Splitter splitter = new Splitter
-            {
-                Dock = DockStyle.Left,
-                Width = Scale(5),
-                BackColor = Color.DarkGray
-            };
-            this.Controls.Add(splitter);
+    txtPlayerFilter = new TextBox
+    {
+        Location = new Point(Scale(8), Scale(36)),
+        Size = new Size(Scale(274), Scale(25)),
+        PlaceholderText = $"{playerName}, !bot (use ! to exclude)",
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    grpFilters.Controls.Add(txtPlayerFilter);
 
-            // Add left panel last
-            this.Controls.Add(leftPanel);
+    // Color selection
+    lblColorFilter = new Label
+    {
+        Text = $"{playerName} plays as:",
+        Location = new Point(Scale(8), Scale(66)),
+        Size = new Size(Scale(270), Scale(16)),
+        Font = new Font("Segoe UI", 8, FontStyle.Regular)
+    };
+    grpFilters.Controls.Add(lblColorFilter);
 
-            // Drag and drop handlers
-            this.DragEnter += Form1_DragEnter;
-            this.DragDrop += Form1_DragDrop;
-        }
+    rbWhite = new RadioButton
+    {
+        Text = "White",
+        Location = new Point(Scale(8), Scale(84)),
+        Size = new Size(Scale(90), Scale(22)),
+        Checked = true,
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    grpFilters.Controls.Add(rbWhite);
 
+    rbBlack = new RadioButton
+    {
+        Text = "Black",
+        Location = new Point(Scale(110), Scale(84)),
+        Size = new Size(Scale(90), Scale(22)),
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    grpFilters.Controls.Add(rbBlack);
+
+    // Max depth
+    lblDepth = new Label
+    {
+        Text = "Max Depth (moves):",
+        Location = new Point(Scale(8), Scale(112)),
+        Size = new Size(Scale(130), Scale(16)),
+        Font = new Font("Segoe UI", 8, FontStyle.Regular)
+    };
+    grpFilters.Controls.Add(lblDepth);
+
+    numDepth = new NumericUpDown
+    {
+        Location = new Point(Scale(145), Scale(110)),
+        Size = new Size(Scale(137), Scale(25)),
+        Minimum = 1,
+        Maximum = 200,
+        Value = 50,
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    grpFilters.Controls.Add(numDepth);
+
+    grpGameSettings.Controls.Add(grpFilters);
+
+    // Apply filter button (outside nested groupbox but still in Game Settings)
+    btnApplyFilter = new Button
+    {
+        Text = "Apply Filters",
+        Location = new Point(Scale(10), Scale(252)),
+        Size = new Size(Scale(290), Scale(28)),
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        BackColor = Color.LightGreen
+    };
+    btnApplyFilter.Click += BtnApplyFilter_Click;
+    grpGameSettings.Controls.Add(btnApplyFilter);
+
+    leftPanel.Controls.Add(grpGameSettings);
+    yPos += Scale(293);
+
+    // ========== GROUP 2: Data Source Status (Compact) ==========
+    GroupBox grpDataStatus = new GroupBox
+    {
+        Text = "Data Source Status",
+        Location = new Point(Scale(5), yPos),
+        Size = new Size(Scale(310), Scale(108)),
+        Font = new Font("Segoe UI", 9, FontStyle.Bold)
+    };
+
+    // Tree status
+    lblTreeStatus = new Label
+    {
+        Text = "Tree: Not loaded",
+        Location = new Point(Scale(10), Scale(22)),
+        Size = new Size(Scale(290), Scale(20)),
+        ForeColor = Color.Gray,
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    grpDataStatus.Controls.Add(lblTreeStatus);
+
+    // Tree flow indicator
+    Label lblTreeFlow = new Label
+    {
+        Text = "Flow: PGN → Tree ⟷ Cache (.dat)",
+        Location = new Point(Scale(10), Scale(42)),
+        Size = new Size(Scale(290), Scale(16)),
+        ForeColor = Color.DarkSlateGray,
+        Font = new Font("Segoe UI", 7, FontStyle.Italic)
+    };
+    grpDataStatus.Controls.Add(lblTreeFlow);
+
+    // Blob status
+    lblBlobStatus = new Label
+    {
+        Text = "Blob: Not loaded",
+        Location = new Point(Scale(10), Scale(62)),
+        Size = new Size(Scale(290), Scale(20)),
+        ForeColor = Color.Gray,
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    grpDataStatus.Controls.Add(lblBlobStatus);
+
+    // Blob flow indicator
+    Label lblBlobFlow = new Label
+    {
+        Text = "Flow: Tree → Blob (.blob) | Blob Files → Blob",
+        Location = new Point(Scale(10), Scale(82)),
+        Size = new Size(Scale(290), Scale(16)),
+        ForeColor = Color.DarkSlateGray,
+        Font = new Font("Segoe UI", 7, FontStyle.Italic)
+    };
+    grpDataStatus.Controls.Add(lblBlobFlow);
+
+    leftPanel.Controls.Add(grpDataStatus);
+    yPos += Scale(116);
+
+    // ========== GROUP 4: Query Source ==========
+    GroupBox grpQuerySource = new GroupBox
+    {
+        Text = "Query Source",
+        Location = new Point(Scale(5), yPos),
+        Size = new Size(Scale(310), Scale(72)),
+        Font = new Font("Segoe UI", 9, FontStyle.Bold)
+    };
+
+    rbUseTree = new RadioButton
+    {
+        Text = "Tree (mutable)",
+        Location = new Point(Scale(10), Scale(22)),
+        Size = new Size(Scale(145), Scale(22)),
+        Checked = true,
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    rbUseTree.CheckedChanged += RbFormat_CheckedChanged;
+    grpQuerySource.Controls.Add(rbUseTree);
+
+    rbUseBlob = new RadioButton
+    {
+        Text = "Blob (fast)",
+        Location = new Point(Scale(160), Scale(22)),
+        Size = new Size(Scale(140), Scale(22)),
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    rbUseBlob.CheckedChanged += RbFormat_CheckedChanged;
+    grpQuerySource.Controls.Add(rbUseBlob);
+
+    leftPanel.Controls.Add(grpQuerySource);
+    yPos += Scale(80);
+
+    // ========== GROUP 5: Tools ==========
+    GroupBox grpTools = new GroupBox
+    {
+        Text = "Database Tools",
+        Location = new Point(Scale(5), yPos),
+        Size = new Size(Scale(310), Scale(92)),
+        Font = new Font("Segoe UI", 9, FontStyle.Bold)
+    };
+
+    btnViewDatabase = new Button
+    {
+        Text = "View Database",
+        Location = new Point(Scale(10), Scale(20)),
+        Size = new Size(Scale(290), Scale(28)),
+        BackColor = Color.LightGreen,
+        Enabled = false,
+        Font = new Font("Segoe UI", 9, FontStyle.Regular)
+    };
+    btnViewDatabase.Click += BtnViewDatabase_Click;
+    grpTools.Controls.Add(btnViewDatabase);
+
+    Button btnOpeningBuilder = new Button
+    {
+        Text = "Opening Builder",
+        Location = new Point(Scale(10), Scale(52)),
+        Size = new Size(Scale(290), Scale(28)),
+        BackColor = Color.LightGoldenrodYellow,
+        Font = new Font("Segoe UI", 9, FontStyle.Bold)
+    };
+    btnOpeningBuilder.Click += BtnOpeningBuilder_Click;
+    grpTools.Controls.Add(btnOpeningBuilder);
+
+    leftPanel.Controls.Add(grpTools);
+    yPos += Scale(100);
+
+    // ========== GROUP 6: Loaded Games ==========
+    // Fixed height group box - scrollable parent panel
+    GroupBox grpLoadedGames = new GroupBox
+    {
+        Text = $"Loaded {playerName}'s Games (multi-select)",
+        Location = new Point(Scale(5), yPos),
+        Size = new Size(Scale(310), Scale(280)),
+        Font = new Font("Segoe UI", 9, FontStyle.Bold),
+        Padding = new Padding(Scale(5), Scale(20), Scale(5), Scale(5))
+    };
+
+    // Add status label first so it docks at bottom
+    lblStatus = new Label
+    {
+        Dock = DockStyle.Bottom,
+        Height = Scale(50),
+        Text = "No games loaded",
+        Font = new Font("Segoe UI", 8, FontStyle.Regular),
+        TextAlign = ContentAlignment.TopLeft,
+        Padding = new Padding(Scale(5), Scale(2), Scale(5), Scale(2)),
+        BackColor = SystemColors.Control // Make it visible with background color
+    };
+    grpLoadedGames.Controls.Add(lblStatus);
+
+    // Add ListBox - positioned to fill space above status label
+    lstGames = new ListBox
+    {
+        Location = new Point(Scale(5), Scale(20)),
+        Size = new Size(Scale(300), Scale(205)),
+        SelectionMode = SelectionMode.MultiExtended,
+        Font = new Font("Consolas", 8),
+        IntegralHeight = false
+    };
+    lstGames.SelectedIndexChanged += LstGames_SelectedIndexChanged;
+    lstGames.KeyDown += LstGames_KeyDown;
+    grpLoadedGames.Controls.Add(lstGames);
+
+    leftPanel.Controls.Add(grpLoadedGames);
+
+    // ========== Right Panel (Tree View) ==========
+    Panel rightPanel = new Panel
+    {
+        Dock = DockStyle.Fill
+    };
+
+    // TreeView - ADD FIRST so it fills remaining space
+    treeView = new TreeView
+    {
+        Dock = DockStyle.Fill,
+        Font = new Font("Consolas", 10),
+        HideSelection = false,
+        ShowLines = true,
+        ShowPlusMinus = true,
+        ShowRootLines = true,
+        Scrollable = true
+    };
+    treeView.NodeMouseClick += TreeView_NodeMouseClick;
+    treeView.NodeMouseDoubleClick += TreeView_NodeMouseDoubleClick;
+    rightPanel.Controls.Add(treeView);
+
+    // Top control panel for tree - ADD SECOND so it docks at top
+    Panel treeControlPanel = new Panel
+    {
+        Dock = DockStyle.Top,
+        Height = Scale(80),
+        Padding = new Padding(Scale(5))
+    };
+
+    // Stats label
+    lblStats = new Label
+    {
+        Text = "Tree View",
+        Location = new Point(Scale(5), Scale(5)),
+        Size = new Size(Scale(800), Scale(25)),
+        Font = new Font("Segoe UI", 12, FontStyle.Bold),
+        TextAlign = ContentAlignment.MiddleLeft,
+        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+    };
+    treeControlPanel.Controls.Add(lblStats);
+
+    // Legend label
+    Label lblLegend = new Label
+    {
+        Text = "Colors: Bold Red (80%+) | Dark Red (50-79%) | Orange (20-49%) | Gray (<20%)  |  Format: Move (games/total = %)",
+        Location = new Point(Scale(5), Scale(33)),
+        Size = new Size(Scale(800), Scale(20)),
+        Font = new Font("Segoe UI", 9),
+        ForeColor = Color.DarkSlateGray,
+        TextAlign = ContentAlignment.MiddleLeft,
+        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+    };
+    treeControlPanel.Controls.Add(lblLegend);
+
+    // Expand/Collapse buttons
+    Button btnExpandAll = new Button
+    {
+        Text = "Expand All",
+        Location = new Point(Scale(5), Scale(55)),
+        Size = new Size(Scale(100), Scale(25))
+    };
+    btnExpandAll.Click += (s, e) => treeView.ExpandAll();
+    treeControlPanel.Controls.Add(btnExpandAll);
+
+    Button btnCollapseAll = new Button
+    {
+        Text = "Collapse All",
+        Location = new Point(Scale(115), Scale(55)),
+        Size = new Size(Scale(100), Scale(25))
+    };
+    btnCollapseAll.Click += (s, e) => treeView.CollapseAll();
+    treeControlPanel.Controls.Add(btnCollapseAll);
+
+    // Show tooltips checkbox
+    chkShowTooltips = new CheckBox
+    {
+        Text = "Show Tooltips",
+        Location = new Point(Scale(225), Scale(57)),
+        Size = new Size(Scale(120), Scale(25)),
+        Checked = true
+    };
+    chkShowTooltips.CheckedChanged += (s, e) => { showTooltips = chkShowTooltips.Checked; };
+    treeControlPanel.Controls.Add(chkShowTooltips);
+
+    rightPanel.Controls.Add(treeControlPanel);
+
+    // ========== MENU STRIP ==========
+    MenuStrip menuStrip = new MenuStrip();
+
+    // Tree Source Menu
+    ToolStripMenuItem treeMenu = new ToolStripMenuItem("Tree Source");
+
+    mnuLoadDatabase = new ToolStripMenuItem("Load PGN Database");
+    mnuLoadDatabase.Click += BtnLoadDatabase_Click;
+    treeMenu.DropDownItems.Add(mnuLoadDatabase);
+
+    mnuLoadTreeCache = new ToolStripMenuItem("Load Tree Cache");
+    mnuLoadTreeCache.Click += BtnLoadCachedDatabase_Click;
+    treeMenu.DropDownItems.Add(mnuLoadTreeCache);
+
+    mnuSaveTreeCache = new ToolStripMenuItem("Save Tree Cache");
+    mnuSaveTreeCache.Click += BtnSaveDatabase_Click;
+    mnuSaveTreeCache.Enabled = false;  // Initially disabled
+    treeMenu.DropDownItems.Add(mnuSaveTreeCache);
+
+    mnuUnloadTree = new ToolStripMenuItem("Unload Tree");
+    mnuUnloadTree.Click += BtnUnloadTree_Click;
+    mnuUnloadTree.Enabled = false;  // Initially disabled
+    treeMenu.DropDownItems.Add(mnuUnloadTree);
+
+    menuStrip.Items.Add(treeMenu);
+
+    // Blob Source Menu
+    ToolStripMenuItem blobMenu = new ToolStripMenuItem("Blob Source");
+
+    mnuLoadBlob = new ToolStripMenuItem("Load Blob Database");
+    mnuLoadBlob.Click += BtnLoadBlob_Click;
+    blobMenu.DropDownItems.Add(mnuLoadBlob);
+
+    mnuSaveBlob = new ToolStripMenuItem("Convert Tree → Blob");
+    mnuSaveBlob.Click += BtnSaveBlob_Click;
+    mnuSaveBlob.Enabled = false;  // Initially disabled
+    blobMenu.DropDownItems.Add(mnuSaveBlob);
+
+    mnuUnloadBlob = new ToolStripMenuItem("Unload Blob");
+    mnuUnloadBlob.Click += BtnUnloadBlob_Click;
+    mnuUnloadBlob.Enabled = false;  // Initially disabled
+    blobMenu.DropDownItems.Add(mnuUnloadBlob);
+
+    menuStrip.Items.Add(blobMenu);
+
+    // Add in reverse Z-order: Fill first, then splitter, then Left, then menu
+    this.Controls.Add(rightPanel);
+
+    // Add a splitter for resizing
+    Splitter splitter = new Splitter
+    {
+        Dock = DockStyle.Left,
+        Width = Scale(5),
+        BackColor = Color.DarkGray
+    };
+    this.Controls.Add(splitter);
+
+    // Add left panel
+    this.Controls.Add(leftPanel);
+
+    // Add menu strip (must be added last to dock at top)
+    this.Controls.Add(menuStrip);
+    this.MainMenuStrip = menuStrip;
+
+    // Drag and drop handlers
+    this.DragEnter += Form1_DragEnter;
+    this.DragDrop += Form1_DragDrop;
+}
         private void LoadSettings()
         {
+            // Load player name
+            playerName = RegistryUtils.GetString("PlayerName", "Theodore");
+            UpdatePlayerNameDisplay();
+
             // Load player filter
-            string savedFilter = RegistryUtils.GetString("PlayerFilter", "Theodore");
+            string savedFilter = RegistryUtils.GetString("PlayerFilter", playerName);
             txtPlayerFilter.Text = savedFilter;
 
             // Load depth filter
@@ -706,9 +783,9 @@ namespace GameHeatmap
                     {
                         databaseTree = loadedTree;
                         btnViewDatabase.Enabled = true;
-                        btnSaveDatabase.Enabled = true;
-                        btnSaveBlob.Enabled = true;
-                        btnUnloadTree.Enabled = true;
+                        mnuSaveTreeCache.Enabled = true;
+                        mnuSaveBlob.Enabled = true;
+                        mnuUnloadTree.Enabled = true;
                         UpdateStatusLabels();
                         lblStatus.Text = $"Auto-loaded cache: {databaseTree.TotalGamesProcessed:N0} games";
                     }
@@ -921,7 +998,7 @@ namespace GameHeatmap
                 }
 
                 binaryNavigator = loadedNavigator;
-                btnUnloadBlob.Enabled = true;
+                mnuUnloadBlob.Enabled = true;
                 btnViewDatabase.Enabled = true;
                 UpdateStatusLabels();
                 lblStatus.Text = $"Auto-loaded blob: {binaryNavigator.TotalGames:N0} games ({elapsed.TotalSeconds:F1}s)";
@@ -996,6 +1073,86 @@ namespace GameHeatmap
             if (allGames.Count > 0 && !string.IsNullOrWhiteSpace(txtPlayerFilter.Text))
             {
                 ApplyFilter();
+            }
+        }
+
+        private void BtnSetPlayerName_Click(object? sender, EventArgs e)
+        {
+            // Show dialog to set player name
+            using (var dialog = new Form())
+            {
+                dialog.Text = "Set Player Name";
+                dialog.Size = new Size(Scale(400), Scale(150));
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.MaximizeBox = false;
+                dialog.MinimizeBox = false;
+
+                Label lblPrompt = new Label
+                {
+                    Text = "Enter player name:",
+                    Location = new Point(Scale(20), Scale(20)),
+                    Size = new Size(Scale(350), Scale(20)),
+                    Font = new Font("Segoe UI", 9)
+                };
+                dialog.Controls.Add(lblPrompt);
+
+                TextBox txtName = new TextBox
+                {
+                    Text = playerName,
+                    Location = new Point(Scale(20), Scale(45)),
+                    Size = new Size(Scale(350), Scale(25)),
+                    Font = new Font("Segoe UI", 10)
+                };
+                dialog.Controls.Add(txtName);
+
+                Button btnOK = new Button
+                {
+                    Text = "OK",
+                    Location = new Point(Scale(180), Scale(80)),
+                    Size = new Size(Scale(90), Scale(30)),
+                    DialogResult = DialogResult.OK
+                };
+                dialog.Controls.Add(btnOK);
+
+                Button btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    Location = new Point(Scale(280), Scale(80)),
+                    Size = new Size(Scale(90), Scale(30)),
+                    DialogResult = DialogResult.Cancel
+                };
+                dialog.Controls.Add(btnCancel);
+
+                dialog.AcceptButton = btnOK;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    string newName = txtName.Text.Trim();
+                    if (!string.IsNullOrEmpty(newName))
+                    {
+                        playerName = newName;
+                        RegistryUtils.SetString("PlayerName", playerName);
+                        UpdatePlayerNameDisplay();
+                    }
+                }
+            }
+        }
+
+        private void UpdatePlayerNameDisplay()
+        {
+            // Update all UI elements that display the player name
+            this.Text = $"Chess Game Heatmap - {playerName}'s Games";
+            lblPlayerName.Text = $"Player: {playerName}";
+            lblColorFilter.Text = $"{playerName} plays as:";
+            btnLoadFiles.Text = $"Load {playerName}'s PGN Files";
+            txtPlayerFilter.PlaceholderText = $"{playerName}, !bot (use ! to exclude)";
+
+            // Update GroupBox title if lstGames is in a GroupBox
+            if (lstGames.Parent is GroupBox grpGames)
+            {
+                grpGames.Text = $"Loaded {playerName}'s Games (multi-select)";
             }
         }
 
@@ -1733,7 +1890,7 @@ namespace GameHeatmap
                                   "Database Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     btnViewDatabase.Enabled = true;
-                    btnSaveDatabase.Enabled = true;
+                    mnuSaveTreeCache.Enabled = true;
                 }
                 catch (Exception ex)
                 {
@@ -2158,9 +2315,9 @@ namespace GameHeatmap
                                               "Cache Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                                 btnViewDatabase.Enabled = true;
-                                btnSaveDatabase.Enabled = true;
-                                btnSaveBlob.Enabled = true;
-                                btnUnloadTree.Enabled = true;
+                                mnuSaveTreeCache.Enabled = true;
+                                mnuSaveBlob.Enabled = true;
+                                mnuUnloadTree.Enabled = true;
                                 rbUseTree.Checked = true;
 
                                 UpdateStatusLabels();
@@ -2196,31 +2353,31 @@ namespace GameHeatmap
             if (rbUseBlob.Checked && binaryNavigator != null)
             {
                 // Pass blob navigator - will materialize only when Generate is clicked
-                var builderForm = new OpeningBuilderForm(theodoreTree, binaryNavigator, rbWhite.Checked, heatmapBuilder);
+                var builderForm = new OpeningBuilderForm(theodoreTree, binaryNavigator, rbWhite.Checked, heatmapBuilder, playerName);
                 builderForm.ShowDialog(this);
             }
             else if (rbUseTree.Checked && databaseTree != null)
             {
                 // Pass tree directly
-                var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder);
+                var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder, playerName);
                 builderForm.ShowDialog(this);
             }
             else if (databaseTree != null)
             {
                 // Fallback to tree
-                var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder);
+                var builderForm = new OpeningBuilderForm(theodoreTree, databaseTree, rbWhite.Checked, heatmapBuilder, playerName);
                 builderForm.ShowDialog(this);
             }
             else if (binaryNavigator != null)
             {
                 // Fallback to blob
-                var builderForm = new OpeningBuilderForm(theodoreTree, binaryNavigator, rbWhite.Checked, heatmapBuilder);
+                var builderForm = new OpeningBuilderForm(theodoreTree, binaryNavigator, rbWhite.Checked, heatmapBuilder, playerName);
                 builderForm.ShowDialog(this);
             }
             else
             {
                 // No database loaded
-                var builderForm = new OpeningBuilderForm(theodoreTree, (MoveFrequencyTree?)null, rbWhite.Checked, heatmapBuilder);
+                var builderForm = new OpeningBuilderForm(theodoreTree, (MoveFrequencyTree?)null, rbWhite.Checked, heatmapBuilder, playerName);
                 builderForm.ShowDialog(this);
             }
         }
@@ -2653,7 +2810,7 @@ namespace GameHeatmap
                     }
 
                     binaryNavigator = loadedNavigator;
-                    btnUnloadBlob.Enabled = true;
+                    mnuUnloadBlob.Enabled = true;
                     rbUseBlob.Checked = true; // Auto-select blob format
 
                     UpdateStatusLabels();
@@ -2684,9 +2841,9 @@ namespace GameHeatmap
             if (result == DialogResult.Yes)
             {
                 databaseTree = null;
-                btnUnloadTree.Enabled = false;
-                btnSaveBlob.Enabled = false;
-                btnSaveDatabase.Enabled = false;
+                mnuUnloadTree.Enabled = false;
+                mnuSaveBlob.Enabled = false;
+                mnuSaveTreeCache.Enabled = false;
                 btnViewDatabase.Enabled = databaseTree != null || binaryNavigator != null;
 
                 UpdateStatusLabels();
@@ -2715,7 +2872,7 @@ namespace GameHeatmap
             if (result == DialogResult.Yes)
             {
                 binaryNavigator = null;
-                btnUnloadBlob.Enabled = false;
+                mnuUnloadBlob.Enabled = false;
                 btnViewDatabase.Enabled = databaseTree != null || binaryNavigator != null;
 
                 UpdateStatusLabels();

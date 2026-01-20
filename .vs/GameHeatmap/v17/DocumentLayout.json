@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\data\\chess\\apps\\GameHeatmap\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\binarytreenavigator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\binarytreenavigator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -34,11 +38,24 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
+              "Title": "Form1.cs",
+              "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs",
+              "RelativeDocumentMoniker": "GameHeatmap\\Form1.cs",
+              "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs",
+              "RelativeToolTip": "GameHeatmap\\Form1.cs",
+              "ViewState": "AgIAAGEBAAAAAAAAAAAiwHcBAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T03:04:54.547Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "DatabaseTreeForm.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\DatabaseTreeForm.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\DatabaseTreeForm.cs",
@@ -50,7 +67,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "OpeningBuilderForm.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\OpeningBuilderForm.cs",
@@ -62,7 +79,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "MoveFrequencyTree.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\MoveFrequencyTree.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\MoveFrequencyTree.cs",
@@ -74,20 +91,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "BinaryTreeNavigator.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\BinaryTreeNavigator.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\BinaryTreeNavigator.cs",
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\BinaryTreeNavigator.cs",
               "RelativeToolTip": "GameHeatmap\\BinaryTreeNavigator.cs",
-              "ViewState": "AgIAAGsAAAAAAAAAAAAAAHcAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAHMAAAAAAAAAAAAUwIYAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-17T09:01:07.969Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "RegistryUtils.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\RegistryUtils.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\RegistryUtils.cs",
@@ -99,7 +116,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Program.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\Program.cs",

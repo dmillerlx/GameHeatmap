@@ -52,14 +52,16 @@ namespace GameHeatmap
         private MoveNode? outputRoot = null;  // Store the generated tree
         private bool isLoadingSettings = false;  // Flag to prevent saving during load
         private float dpiScale = 1.0f;
+        private string playerName = "Theodore";
 
-        public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, MoveFrequencyTree? databaseTree, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null)
+        public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, MoveFrequencyTree? databaseTree, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null, string playerName = "Theodore")
         {
             this.theodoreTree = theodoreTree;
             this.theodoreHeatmap = theodoreHeatmap;
             this.databaseTree = databaseTree;
             this.databaseBlob = null;
             this.theodorePlaysWhite = theodorePlaysWhite;
+            this.playerName = playerName;
 
             InitializeComponent();
             LoadSettings();
@@ -69,13 +71,14 @@ namespace GameHeatmap
             this.FormClosing += (s, e) => SaveSettings();
         }
 
-        public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, BinaryTreeNavigator? databaseBlob, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null)
+        public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, BinaryTreeNavigator? databaseBlob, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null, string playerName = "Theodore")
         {
             this.theodoreTree = theodoreTree;
             this.theodoreHeatmap = theodoreHeatmap;
             this.databaseTree = null;
             this.databaseBlob = databaseBlob;  // Store blob, materialize later
             this.theodorePlaysWhite = theodorePlaysWhite;
+            this.playerName = playerName;
 
             InitializeComponent();
             LoadSettings();
@@ -244,10 +247,10 @@ namespace GameHeatmap
             // TOP PANEL - Configuration (redesigned for better space usage)
             Panel topPanel = new Panel { Dock = DockStyle.Top, Height = Scale(140), Padding = new Padding(Scale(10)) };
 
-            // ROW 1: Theodore color + Numeric settings
+            // ROW 1: Player color + Numeric settings
             lblTheodoreColor = new Label
             {
-                Text = $"Theodore plays: {(theodorePlaysWhite ? "WHITE" : "BLACK")}",
+                Text = $"{playerName} plays: {(theodorePlaysWhite ? "WHITE" : "BLACK")}",
                 Location = new Point(Scale(10), Scale(10)),
                 Size = new Size(Scale(150), Scale(25)),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
@@ -287,13 +290,13 @@ namespace GameHeatmap
             topPanel.Controls.Add(chkDebugOutput);
             
             // ROW 2: Data source checkboxes
-            chkUseTheodoreGames = new CheckBox { Text = "Use Theodore Games", Location = new Point(Scale(10), Scale(42)), Size = new Size(Scale(150), Scale(20)), Checked = theodoreTree != null };
+            chkUseTheodoreGames = new CheckBox { Text = $"Use {playerName} Games", Location = new Point(Scale(10), Scale(42)), Size = new Size(Scale(150), Scale(20)), Checked = theodoreTree != null };
             topPanel.Controls.Add(chkUseTheodoreGames);
 
             chkUseDatabaseGames = new CheckBox { Text = "Use Database", Location = new Point(Scale(170), Scale(42)), Size = new Size(Scale(120), Scale(20)), Checked = databaseTree != null };
             topPanel.Controls.Add(chkUseDatabaseGames);
 
-            chkIncludeTheodoreAnnotations = new CheckBox { Text = "Theodore Annot", Location = new Point(Scale(300), Scale(42)), Size = new Size(Scale(120), Scale(20)), Checked = true };
+            chkIncludeTheodoreAnnotations = new CheckBox { Text = $"{playerName} Annot", Location = new Point(Scale(300), Scale(42)), Size = new Size(Scale(120), Scale(20)), Checked = true };
             chkIncludeTheodoreAnnotations.CheckedChanged += AnnotationCheckbox_CheckedChanged;
             topPanel.Controls.Add(chkIncludeTheodoreAnnotations);
 
@@ -306,7 +309,7 @@ namespace GameHeatmap
             topPanel.Controls.Add(chkUseShortComments);
 
             // ROW 3: Comment templates and max opponents
-            Label lblCommentTemplate = new Label { Text = "Theodore:", Location = new Point(Scale(10), Scale(72)), Size = new Size(Scale(65), Scale(20)) };
+            Label lblCommentTemplate = new Label { Text = $"{playerName}:", Location = new Point(Scale(10), Scale(72)), Size = new Size(Scale(65), Scale(20)) };
             topPanel.Controls.Add(lblCommentTemplate);
 
             txtCommentTemplate = new TextBox
@@ -482,7 +485,7 @@ namespace GameHeatmap
             
             if (!chkUseTheodoreGames.Checked && !chkUseDatabaseGames.Checked)
             {
-                MessageBox.Show("Please select at least one data source (Theodore's games or Database)",
+                MessageBox.Show($"Please select at least one data source ({playerName}'s games or Database)",
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
