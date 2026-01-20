@@ -539,30 +539,31 @@ namespace GameHeatmap
             }
         }
         
-        private MoveNode CopyMoveTree(MoveNode source, bool isWhiteToMove = true)
+        private MoveNode CopyMoveTree(MoveNode source, bool isWhiteToMove = true, bool isFirstChild = true)
         {
             var copy = new MoveNode
             {
                 MoveNumber = source.MoveNumber,
                 San = source.San,
                 Comment = source.Comment,
-                IsMainlineMove = true,  // Mainline moves from copied tree
+                IsMainlineMove = isFirstChild,  // Only first child is mainline, rest are PGN variations
                 // If it's white to move and this node has a move, the move is by white
                 // After white moves, isWhiteTurn = false (black to move next)
                 // If this is the root dummy node (no San), don't change isWhiteTurn
                 isWhiteTurn = string.IsNullOrEmpty(source.San) ? false : !isWhiteToMove
             };
-            
+
             // After this move, opposite color to move
             bool nextIsWhiteToMove = string.IsNullOrEmpty(source.San) ? true : !isWhiteToMove;
-            
-            foreach (var child in source.NextMoves)
+
+            for (int i = 0; i < source.NextMoves.Count; i++)
             {
-                var childCopy = CopyMoveTree(child, nextIsWhiteToMove);
+                var child = source.NextMoves[i];
+                var childCopy = CopyMoveTree(child, nextIsWhiteToMove, i == 0);
                 childCopy.Parent = copy;
                 copy.NextMoves.Add(childCopy);
             }
-            
+
             return copy;
         }
 
@@ -672,7 +673,7 @@ namespace GameHeatmap
             // Stop at max depth
             if (depth >= maxDepth)
                 return;
-            
+
             // No mainline to continue - need to add moves from database
             if (node.NextMoves.Count == 0)
             {
@@ -879,10 +880,13 @@ namespace GameHeatmap
                         mainlineMove.Comment = "[No opponent alternatives found]";
                 }
                 
-                // Add variations (excluding mainline)
+                // Get existing moves from PGN (to avoid duplicates)
+                var existingMoves = new HashSet<string>(node.NextMoves.Select(m => m.San));
+
+                // Add variations (excluding mainline and existing PGN variations)
                 foreach (var (san, source, frequency, hasTheodore, hasDatabase) in alternativeMoves)
                 {
-                    if (san != mainlineMove.San)
+                    if (san != mainlineMove.San && !existingMoves.Contains(san))
                     {
                         var variationNode = new MoveNode
                         {
@@ -903,6 +907,17 @@ namespace GameHeatmap
                             BuildVariations(variationNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
                         }
                     }
+                    else if (existingMoves.Contains(san))
+                    {
+                        // This move already exists in PGN variations - annotate it
+                        var existingNode = node.NextMoves.FirstOrDefault(m => m.San == san);
+                        if (existingNode != null && string.IsNullOrEmpty(existingNode.Comment))
+                        {
+                            existingNode.Comment = source;
+                            existingNode.HasTheodoreComment = hasTheodore;
+                            existingNode.HasDatabaseComment = hasDatabase;
+                        }
+                    }
                 }
 
                 // Annotate mainline with database frequencies if annotations are enabled
@@ -921,9 +936,13 @@ namespace GameHeatmap
                     }
                 }
             }
-            
-            // ALWAYS continue mainline
-            BuildVariations(mainlineMove, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
+
+            // Continue building variations for ALL children (mainline + PGN variations)
+            // This ensures that variations from the source PGN are also explored
+            foreach (var child in node.NextMoves)
+            {
+                BuildVariations(child, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
+            }
         }
 
         
