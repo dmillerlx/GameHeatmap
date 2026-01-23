@@ -54,6 +54,10 @@ namespace GameHeatmap
         private float dpiScale = 1.0f;
         private string playerName = "Theodore";
 
+        // Undo/Redo system
+        private Stack<TreeSnapshot> undoStack = new Stack<TreeSnapshot>();
+        private Stack<TreeSnapshot> redoStack = new Stack<TreeSnapshot>();
+
         public OpeningBuilderForm(MoveFrequencyTree? theodoreTree, MoveFrequencyTree? databaseTree, bool theodorePlaysWhite, HeatmapBuilder? theodoreHeatmap = null, string playerName = "Theodore")
         {
             this.theodoreTree = theodoreTree;
@@ -163,6 +167,8 @@ namespace GameHeatmap
             this.Text = "Opening Builder";
             this.Size = new Size(Scale(1400), Scale(800));
             this.StartPosition = FormStartPosition.CenterScreen;
+            this.KeyPreview = true;  // Enable keyboard shortcuts
+            this.KeyDown += OpeningBuilderForm_KeyDown;
 
             // Split container for left/right panes
             SplitContainer splitContainer = new SplitContainer
@@ -239,6 +245,37 @@ namespace GameHeatmap
                 ShowLines = true,
                 ShowPlusMinus = true
             };
+            treeVariations.NodeMouseDoubleClick += TreeVariations_NodeMouseDoubleClick;
+            treeVariations.KeyDown += TreeVariations_KeyDown;
+
+            // Create context menu
+            var contextMenu = new ContextMenuStrip();
+            contextMenu.Items.Add("Delete Node (Del)", null, (s, e) => {
+                if (treeVariations.SelectedNode?.Tag is MoveNode node) DeleteNode(node);
+            });
+            contextMenu.Items.Add("Keep Mainline Only (M)", null, (s, e) => {
+                if (treeVariations.SelectedNode?.Tag is MoveNode node) KeepMainlineOnly(node);
+            });
+            contextMenu.Items.Add("-"); // Separator
+            contextMenu.Items.Add("Edit Comment (Enter)", null, (s, e) => {
+                if (treeVariations.SelectedNode?.Tag is MoveNode node) EditComment(node);
+            });
+            contextMenu.Items.Add("Insert Move (Insert)", null, (s, e) => {
+                if (treeVariations.SelectedNode?.Tag is MoveNode node) InsertMove(node);
+            });
+            contextMenu.Items.Add("-"); // Separator
+            contextMenu.Items.Add("Open in Chess.com (C)", null, (s, e) => {
+                if (treeVariations.SelectedNode?.Tag is MoveNode node) OpenChessDotCom(node);
+            });
+            contextMenu.Items.Add("Regenerate from Here (R)", null, (s, e) => {
+                if (treeVariations.SelectedNode?.Tag is MoveNode node) RegenerateFromNode(node);
+            });
+            contextMenu.Items.Add("-"); // Separator
+            contextMenu.Items.Add("Expand All (Ctrl+E)", null, (s, e) => treeVariations.ExpandAll());
+            contextMenu.Items.Add("Collapse All (Ctrl+Shift+E)", null, (s, e) => treeVariations.CollapseAll());
+
+            treeVariations.ContextMenuStrip = contextMenu;
+
             rightPanel.Controls.Add(treeVariations);
             treeVariations.BringToFront();
 
@@ -1319,7 +1356,9 @@ namespace GameHeatmap
                 }
                 
                 var treeNode = new TreeNode(sb.ToString());
-                
+                // Set Tag to the last move in the sequence for keyboard shortcuts
+                treeNode.Tag = moves[moves.Count - 1];
+
                 // Check if any move in the sequence has a comment (variation)
                 // If all moves have no comment or only mainline markers, it's mainline (black/bold)
                 // If any move has a variation comment, use that for coloring
@@ -1378,8 +1417,10 @@ namespace GameHeatmap
                 // Format like Form1: white = "N.", black = "N..."
                 string moveNum = moveByWhite ? $"{child.MoveNumber}." : $"{child.MoveNumber}...";
                 string comment = !string.IsNullOrEmpty(child.Comment) && !child.Comment.StartsWith("[MAINLINE]") ? $" {{ {child.Comment} }}" : "";
-                
+
                 var treeNode = new TreeNode($"{moveNum}{child.San}{comment}");
+                // Set Tag to the MoveNode for keyboard shortcuts
+                treeNode.Tag = child;
                 
                 // Color coding based on source
                 if (string.IsNullOrEmpty(child.Comment) || child.Comment.StartsWith("[MAINLINE]"))
@@ -1901,6 +1942,704 @@ namespace GameHeatmap
             }
 
             return node;
+        }
+
+        // =====================================================
+        // TREE EDITING FEATURES
+        // =====================================================
+
+        /// <summary>
+        /// Snapshot of the tree state for undo/redo
+        /// </summary>
+        private class TreeSnapshot
+        {
+            public MoveNode? Root { get; set; }
+            public string Description { get; set; } = "";
+
+            public TreeSnapshot(MoveNode? root, string description)
+            {
+                Root = root != null ? DeepClone(root) : null;
+                Description = description;
+            }
+
+            private static MoveNode DeepClone(MoveNode node)
+            {
+                var clone = new MoveNode
+                {
+                    MoveNumber = node.MoveNumber,
+                    San = node.San,
+                    SanExtra = node.SanExtra,
+                    Comment = node.Comment,
+                    HasTheodoreComment = node.HasTheodoreComment,
+                    HasDatabaseComment = node.HasDatabaseComment,
+                    IsMainlineMove = node.IsMainlineMove,
+                    isWhiteTurn = node.isWhiteTurn,
+                    boardCache = node.boardCache
+                };
+
+                foreach (var child in node.NextMoves)
+                {
+                    var childClone = DeepClone(child);
+                    childClone.Parent = clone;
+                    clone.NextMoves.Add(childClone);
+                }
+
+                return clone;
+            }
+        }
+
+        private void SaveSnapshot(string description)
+        {
+            undoStack.Push(new TreeSnapshot(outputRoot, description));
+            redoStack.Clear(); // Clear redo stack when new action is performed
+        }
+
+        private void Undo()
+        {
+            if (undoStack.Count == 0)
+            {
+                MessageBox.Show("Nothing to undo", "Undo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Save current state to redo stack
+            redoStack.Push(new TreeSnapshot(outputRoot, "Before undo"));
+
+            // Restore previous state
+            var snapshot = undoStack.Pop();
+            outputRoot = snapshot.Root;
+            RefreshTreeView();
+        }
+
+        private void Redo()
+        {
+            if (redoStack.Count == 0)
+            {
+                MessageBox.Show("Nothing to redo", "Redo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Save current state to undo stack
+            undoStack.Push(new TreeSnapshot(outputRoot, "Before redo"));
+
+            // Restore redo state
+            var snapshot = redoStack.Pop();
+            outputRoot = snapshot.Root;
+            RefreshTreeView();
+        }
+
+        private void RefreshTreeView()
+        {
+            treeVariations.Nodes.Clear();
+            if (outputRoot != null)
+            {
+                DisplayTreeInView(outputRoot);
+            }
+        }
+
+        private void OpeningBuilderForm_KeyDown(object? sender, KeyEventArgs e)
+        {
+            // Get selected node
+            var selectedTreeNode = treeVariations.SelectedNode;
+            if (selectedTreeNode == null && e.KeyCode != Keys.E && e.KeyCode != Keys.Z && e.KeyCode != Keys.Y)
+                return;
+
+            var selectedMoveNode = selectedTreeNode?.Tag as MoveNode;
+
+            switch (e.KeyCode)
+            {
+                case Keys.Delete:
+                    if (selectedMoveNode != null)
+                        DeleteNode(selectedMoveNode);
+                    e.Handled = true;
+                    break;
+
+                case Keys.M:
+                    if (selectedMoveNode != null)
+                        KeepMainlineOnly(selectedMoveNode);
+                    e.Handled = true;
+                    break;
+
+                case Keys.Z:
+                    if (e.Control)
+                    {
+                        Undo();
+                        e.Handled = true;
+                    }
+                    break;
+
+                case Keys.Y:
+                    if (e.Control)
+                    {
+                        Redo();
+                        e.Handled = true;
+                    }
+                    break;
+
+                case Keys.Enter:
+                    if (selectedMoveNode != null)
+                        EditComment(selectedMoveNode);
+                    e.Handled = true;
+                    break;
+
+                case Keys.Insert:
+                    if (selectedMoveNode != null)
+                        InsertMove(selectedMoveNode);
+                    e.Handled = true;
+                    break;
+
+                case Keys.C:
+                    if (selectedMoveNode != null)
+                        OpenChessDotCom(selectedMoveNode);
+                    e.Handled = true;
+                    break;
+
+                case Keys.R:
+                    if (selectedMoveNode != null)
+                        RegenerateFromNode(selectedMoveNode);
+                    e.Handled = true;
+                    break;
+
+                case Keys.Space:
+                    if (selectedTreeNode != null)
+                    {
+                        if (selectedTreeNode.IsExpanded)
+                            selectedTreeNode.Collapse();
+                        else
+                            selectedTreeNode.Expand();
+                        e.Handled = true;
+                    }
+                    break;
+
+                case Keys.E:
+                    if (e.Control && e.Shift)
+                    {
+                        treeVariations.CollapseAll();
+                        e.Handled = true;
+                    }
+                    else if (e.Control)
+                    {
+                        treeVariations.ExpandAll();
+                        e.Handled = true;
+                    }
+                    break;
+            }
+        }
+
+        private void TreeVariations_KeyDown(object? sender, KeyEventArgs e)
+        {
+            // Handle keyboard shortcuts on the TreeView
+            var selectedTreeNode = treeVariations.SelectedNode;
+            if (selectedTreeNode == null && e.KeyCode != Keys.E && e.KeyCode != Keys.Z && e.KeyCode != Keys.Y)
+                return;
+
+            var selectedMoveNode = selectedTreeNode?.Tag as MoveNode;
+
+            switch (e.KeyCode)
+            {
+                case Keys.Delete:
+                    if (selectedMoveNode != null)
+                    {
+                        DeleteNode(selectedMoveNode);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.M:
+                    if (selectedMoveNode != null)
+                    {
+                        KeepMainlineOnly(selectedMoveNode);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.Z:
+                    if (e.Control)
+                    {
+                        Undo();
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.Y:
+                    if (e.Control)
+                    {
+                        Redo();
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.Enter:
+                    if (selectedMoveNode != null)
+                    {
+                        EditComment(selectedMoveNode);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.Insert:
+                    if (selectedMoveNode != null)
+                    {
+                        InsertMove(selectedMoveNode);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.C:
+                    if (selectedMoveNode != null)
+                    {
+                        OpenChessDotCom(selectedMoveNode);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.R:
+                    if (selectedMoveNode != null)
+                    {
+                        RegenerateFromNode(selectedMoveNode);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.Space:
+                    if (selectedTreeNode != null)
+                    {
+                        if (selectedTreeNode.IsExpanded)
+                            selectedTreeNode.Collapse();
+                        else
+                            selectedTreeNode.Expand();
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.E:
+                    if (e.Control && e.Shift)
+                    {
+                        treeVariations.CollapseAll();
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    else if (e.Control)
+                    {
+                        treeVariations.ExpandAll();
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+            }
+        }
+
+        private void TreeVariations_NodeMouseDoubleClick(object? sender, TreeNodeMouseClickEventArgs e)
+        {
+            if (e.Node.IsExpanded)
+                e.Node.Collapse();
+            else
+                e.Node.Expand();
+        }
+
+        private void DeleteNode(MoveNode node)
+        {
+            if (node == outputRoot)
+            {
+                MessageBox.Show("Cannot delete root node", "Delete", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"Delete '{node.San}' and all variations below it?",
+                "Confirm Delete",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                SaveSnapshot($"Delete {node.San}");
+
+                // Find the TreeNode that corresponds to this MoveNode
+                TreeNode? treeNodeToDelete = FindTreeNode(treeVariations.Nodes, node);
+
+                if (node.Parent != null)
+                {
+                    node.Parent.NextMoves.Remove(node);
+                }
+
+                // Remove from TreeView directly instead of rebuilding
+                if (treeNodeToDelete != null && treeNodeToDelete.Parent != null)
+                {
+                    treeNodeToDelete.Parent.Nodes.Remove(treeNodeToDelete);
+                }
+                else if (treeNodeToDelete != null)
+                {
+                    // Top-level node
+                    treeVariations.Nodes.Remove(treeNodeToDelete);
+                }
+            }
+        }
+
+        private TreeNode? FindTreeNode(TreeNodeCollection nodes, MoveNode moveNode)
+        {
+            foreach (TreeNode treeNode in nodes)
+            {
+                if (treeNode.Tag == moveNode)
+                    return treeNode;
+
+                var found = FindTreeNode(treeNode.Nodes, moveNode);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        private void KeepMainlineOnly(MoveNode node)
+        {
+            var result = MessageBox.Show(
+                $"Keep only the mainline (top variation) from '{node.San}' onwards?\nThis will remove all alternative variations below this move.",
+                "Confirm Keep Mainline Only",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                SaveSnapshot($"Keep mainline only from {node.San}");
+
+                // Find the TreeNode for this MoveNode
+                TreeNode? treeNode = FindTreeNode(treeVariations.Nodes, node);
+
+                // Remove sibling variations from both MoveNode tree and TreeView
+                KeepMainlineRecursiveWithTreeView(node, treeNode);
+            }
+        }
+
+        private void KeepMainlineRecursiveWithTreeView(MoveNode node, TreeNode? treeNode)
+        {
+            // Keep only the first child if there are multiple
+            if (node.NextMoves.Count > 1)
+            {
+                // Keep only the first move (mainline) in MoveNode tree
+                var mainline = node.NextMoves[0];
+                node.NextMoves.Clear();
+                node.NextMoves.Add(mainline);
+
+                // Remove sibling TreeNodes if we have the TreeNode
+                if (treeNode != null && treeNode.Nodes.Count > 1)
+                {
+                    // Find which TreeNode corresponds to the mainline
+                    TreeNode? mainlineTreeNode = null;
+                    foreach (TreeNode child in treeNode.Nodes)
+                    {
+                        if (child.Tag == mainline)
+                        {
+                            mainlineTreeNode = child;
+                            break;
+                        }
+                    }
+
+                    // Remove all other TreeNodes
+                    treeNode.Nodes.Clear();
+                    if (mainlineTreeNode != null)
+                    {
+                        treeNode.Nodes.Add(mainlineTreeNode);
+                    }
+                }
+            }
+
+            // ALWAYS recursively process children (even if this node had only 1 child)
+            // This ensures we clean up variations deeper in the tree
+            if (node.NextMoves.Count > 0)
+            {
+                TreeNode? nextTreeNode = null;
+                if (treeNode != null && treeNode.Nodes.Count > 0)
+                {
+                    nextTreeNode = treeNode.Nodes[0];
+                }
+
+                // Process the mainline child
+                KeepMainlineRecursiveWithTreeView(node.NextMoves[0], nextTreeNode);
+            }
+        }
+
+        private void EditComment(MoveNode node)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = $"Edit Comment - {node.San}";
+                dialog.Size = new Size(Scale(500), Scale(300));
+                dialog.StartPosition = FormStartPosition.CenterParent;
+
+                var txtComment = new TextBox
+                {
+                    Multiline = true,
+                    ScrollBars = ScrollBars.Vertical,
+                    Text = node.Comment,
+                    Dock = DockStyle.Fill,
+                    Font = new Font("Consolas", 10)
+                };
+                dialog.Controls.Add(txtComment);
+
+                var btnPanel = new Panel { Dock = DockStyle.Bottom, Height = Scale(40) };
+                var btnOK = new Button
+                {
+                    Text = "OK",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(Scale(10), Scale(5)),
+                    Size = new Size(Scale(80), Scale(30))
+                };
+                var btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(Scale(100), Scale(5)),
+                    Size = new Size(Scale(80), Scale(30))
+                };
+                btnPanel.Controls.Add(btnOK);
+                btnPanel.Controls.Add(btnCancel);
+                dialog.Controls.Add(btnPanel);
+                dialog.AcceptButton = btnOK;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    SaveSnapshot($"Edit comment for {node.San}");
+                    node.Comment = txtComment.Text;
+
+                    // Update the TreeNode text directly instead of rebuilding
+                    TreeNode? treeNode = FindTreeNode(treeVariations.Nodes, node);
+                    if (treeNode != null)
+                    {
+                        // Rebuild the text for this node
+                        bool moveByWhite = !node.isWhiteTurn;
+                        string moveNum = moveByWhite ? $"{node.MoveNumber}." : $"{node.MoveNumber}...";
+                        string comment = !string.IsNullOrEmpty(node.Comment) && !node.Comment.StartsWith("[MAINLINE]") ? $" {{ {node.Comment} }}" : "";
+                        treeNode.Text = $"{moveNum}{node.San}{comment}";
+                    }
+                }
+            }
+        }
+
+        private void InsertMove(MoveNode node)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = $"Insert Move After {node.San}";
+                dialog.Size = new Size(Scale(400), Scale(150));
+                dialog.StartPosition = FormStartPosition.CenterParent;
+
+                var lblPrompt = new Label
+                {
+                    Text = "Enter move in SAN notation (e.g., Nf3, e4, O-O):",
+                    Location = new Point(Scale(10), Scale(10)),
+                    Size = new Size(Scale(380), Scale(20))
+                };
+                dialog.Controls.Add(lblPrompt);
+
+                var txtMove = new TextBox
+                {
+                    Location = new Point(Scale(10), Scale(35)),
+                    Size = new Size(Scale(380), Scale(25)),
+                    Font = new Font("Consolas", 10)
+                };
+                dialog.Controls.Add(txtMove);
+
+                var btnOK = new Button
+                {
+                    Text = "OK",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(Scale(10), Scale(70)),
+                    Size = new Size(Scale(80), Scale(30))
+                };
+                var btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(Scale(100), Scale(70)),
+                    Size = new Size(Scale(80), Scale(30))
+                };
+                dialog.Controls.Add(btnOK);
+                dialog.Controls.Add(btnCancel);
+                dialog.AcceptButton = btnOK;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    string move = txtMove.Text.Trim();
+                    if (string.IsNullOrEmpty(move))
+                        return;
+
+                    SaveSnapshot($"Insert move {move} after {node.San}");
+
+                    // Create new move node
+                    // isWhiteTurn = false means "this move was by white"
+                    // isWhiteTurn = true means "this move was by black"
+                    // So if parent.isWhiteTurn = false (parent was white's move), next is black's move (same move number)
+                    // If parent.isWhiteTurn = true (parent was black's move), next is white's move (increment move number)
+                    var newNode = new MoveNode
+                    {
+                        MoveNumber = node.MoveNumber + (node.isWhiteTurn ? 1 : 0),
+                        San = move,
+                        Comment = "",
+                        Parent = node,
+                        isWhiteTurn = !node.isWhiteTurn
+                    };
+
+                    // Add as a variation to MoveNode tree
+                    node.NextMoves.Add(newNode);
+
+                    // Find the TreeNode for the parent move
+                    TreeNode? parentTreeNode = FindTreeNode(treeVariations.Nodes, node);
+
+                    // Ask if user wants to generate variations from this point
+                    var result = MessageBox.Show(
+                        "Generate variations from this new move?",
+                        "Generate Variations",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        // Get current sequence to this point
+                        var moveSequence = new List<string>();
+                        BuildMoveSequence(newNode, moveSequence);
+
+                        // Generate variations from this point
+                        int maxBranches = (int)numMaxBranches.Value;
+                        int percentThreshold = (int)numPercentThreshold.Value;
+                        int maxDepth = (int)numMaxDepth.Value * 2;
+                        int startMove = (int)numStartMove.Value;
+
+                        int currentDepth = moveSequence.Count;
+                        BuildVariations(newNode, currentDepth, maxDepth, maxBranches, percentThreshold, startMove);
+                    }
+
+                    // Add the new node (and any generated children) to TreeView
+                    if (parentTreeNode != null)
+                    {
+                        // Create TreeNode for the new move
+                        bool moveByWhite = !newNode.isWhiteTurn;
+                        string moveNum = moveByWhite ? $"{newNode.MoveNumber}." : $"{newNode.MoveNumber}...";
+                        var newTreeNode = new TreeNode($"{moveNum}{newNode.San}");
+                        newTreeNode.Tag = newNode;
+                        newTreeNode.ForeColor = Color.Blue; // User-inserted moves in blue
+
+                        parentTreeNode.Nodes.Add(newTreeNode);
+
+                        // If we generated variations, build the subtree
+                        if (result == DialogResult.Yes)
+                        {
+                            BuildTreeViewRecursive(newNode, newTreeNode);
+                        }
+
+                        parentTreeNode.Expand();
+                        newTreeNode.EnsureVisible();
+                    }
+                }
+            }
+        }
+
+        private void BuildMoveSequence(MoveNode node, List<string> sequence)
+        {
+            if (node.Parent != null)
+            {
+                BuildMoveSequence(node.Parent, sequence);
+            }
+            if (!string.IsNullOrEmpty(node.San))
+            {
+                sequence.Add(node.San);
+            }
+        }
+
+        private void OpenChessDotCom(MoveNode node)
+        {
+            try
+            {
+                // Build move sequence from root to selected node
+                var moveSequence = new List<string>();
+                BuildMoveSequence(node, moveSequence);
+
+                // Generate PGN
+                var pgn = new StringBuilder();
+                for (int i = 0; i < moveSequence.Count; i++)
+                {
+                    // Add move number for white's moves
+                    if (i % 2 == 0)
+                    {
+                        int moveNumber = (i / 2) + 1;
+                        pgn.Append($"{moveNumber}.");
+                    }
+
+                    pgn.Append(moveSequence[i]);
+                    pgn.Append(" ");
+                }
+
+                string pgnString = pgn.ToString().Trim();
+                string encodedPgn = System.Web.HttpUtility.UrlEncode(pgnString);
+
+                // Chess.com will show the position at the END of the PGN by default
+                string url = $"https://www.chess.com/analysis?pgn={encodedPgn}";
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open Chess.com:\n\n{ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void RegenerateFromNode(MoveNode node)
+        {
+            var result = MessageBox.Show(
+                $"Regenerate variations from '{node.San}' using current settings?\nThis will replace all existing variations below this move.",
+                "Confirm Regenerate",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                SaveSnapshot($"Regenerate from {node.San}");
+
+                // Find the TreeNode for this MoveNode
+                TreeNode? treeNode = FindTreeNode(treeVariations.Nodes, node);
+
+                // Clear existing variations from both MoveNode and TreeView
+                node.NextMoves.Clear();
+                if (treeNode != null)
+                {
+                    treeNode.Nodes.Clear();
+                }
+
+                // Get move sequence to this point
+                var moveSequence = new List<string>();
+                BuildMoveSequence(node, moveSequence);
+
+                // Generate new variations
+                int maxBranches = (int)numMaxBranches.Value;
+                int percentThreshold = (int)numPercentThreshold.Value;
+                int maxDepth = (int)numMaxDepth.Value * 2;
+                int startMove = (int)numStartMove.Value;
+
+                int currentDepth = moveSequence.Count;
+                BuildVariations(node, currentDepth, maxDepth, maxBranches, percentThreshold, startMove);
+
+                // Rebuild just this subtree in the TreeView
+                if (treeNode != null)
+                {
+                    BuildTreeViewRecursive(node, treeNode);
+                    treeNode.ExpandAll();
+                }
+            }
         }
     }
 }
