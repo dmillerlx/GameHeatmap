@@ -3,20 +3,24 @@
   "WorkspaceRootPath": "C:\\data\\chess\\apps\\GameHeatmap\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\openingbuilderform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\openingbuilderform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\chessboard.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\chessboard.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\chessboardviewer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\chessboardviewer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\binarytreenavigator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\binarytreenavigator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\openingbuilderform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\openingbuilderform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|solutionrelative:gameheatmap\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{98FBA7D5-9B10-44AF-A380-58BF77AB3BAF}|GameHeatmap\\GameHeatmap.csproj|c:\\data\\chess\\apps\\gameheatmap\\gameheatmap\\databasetreeform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -42,24 +46,37 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "ChessBoardViewer.cs",
+              "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\ChessBoardViewer.cs",
+              "RelativeDocumentMoniker": "GameHeatmap\\ChessBoardViewer.cs",
+              "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\ChessBoardViewer.cs",
+              "RelativeToolTip": "GameHeatmap\\ChessBoardViewer.cs",
+              "ViewState": "AgIAAH4CAAAAAAAAAADwv4gCAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-24T17:57:17.322Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
               "Title": "ChessBoard.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\ChessBoard.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\ChessBoard.cs",
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\ChessBoard.cs",
               "RelativeToolTip": "GameHeatmap\\ChessBoard.cs",
-              "ViewState": "AgIAAAgAAAAAAAAAAAAUwBYAAAAJAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-24T06:48:00.235Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "Form1.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Form1.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\Form1.cs",
@@ -67,12 +84,11 @@
               "RelativeToolTip": "GameHeatmap\\Form1.cs",
               "ViewState": "AgIAAF8GAAAAAAAAAAAvwG8GAAAyAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-01-20T03:04:54.547Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-01-20T03:04:54.547Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "DatabaseTreeForm.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\DatabaseTreeForm.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\DatabaseTreeForm.cs",
@@ -80,25 +96,24 @@
               "RelativeToolTip": "GameHeatmap\\DatabaseTreeForm.cs",
               "ViewState": "AgIAAIsAAAAAAAAAAAAowJUAAAAeAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-01-19T18:02:42.537Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-01-19T18:02:42.537Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 3,
               "Title": "OpeningBuilderForm.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\OpeningBuilderForm.cs",
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\OpeningBuilderForm.cs",
               "RelativeToolTip": "GameHeatmap\\OpeningBuilderForm.cs",
-              "ViewState": "AgIAAJUKAAAAAAAAAAAawKsKAAAzAAAAAAAAAA==",
+              "ViewState": "AgIAAK0KAAAAAAAAAAAAwMAKAABEAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-12-20T01:12:58.268Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "MoveFrequencyTree.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\MoveFrequencyTree.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\MoveFrequencyTree.cs",
@@ -106,25 +121,24 @@
               "RelativeToolTip": "GameHeatmap\\MoveFrequencyTree.cs",
               "ViewState": "AgIAACsEAAAAAAAAAAAUwDoEAAAwAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-19T21:33:55.381Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-19T21:33:55.381Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 2,
               "Title": "BinaryTreeNavigator.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\BinaryTreeNavigator.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\BinaryTreeNavigator.cs",
               "ToolTip": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\BinaryTreeNavigator.cs",
               "RelativeToolTip": "GameHeatmap\\BinaryTreeNavigator.cs",
-              "ViewState": "AgIAAAwAAAAAAAAAAAAvwAwAAAAkAAAAAAAAAA==",
+              "ViewState": "AgIAAGcCAAAAAAAAAADwv3ECAAAeAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-17T09:01:07.969Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "RegistryUtils.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\RegistryUtils.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\RegistryUtils.cs",
@@ -132,12 +146,11 @@
               "RelativeToolTip": "GameHeatmap\\RegistryUtils.cs",
               "ViewState": "AgIAAAIAAAAAAAAAAAAAABIAAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-12-23T08:19:24.954Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-23T08:19:24.954Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\data\\chess\\apps\\GameHeatmap\\GameHeatmap\\Program.cs",
               "RelativeDocumentMoniker": "GameHeatmap\\Program.cs",

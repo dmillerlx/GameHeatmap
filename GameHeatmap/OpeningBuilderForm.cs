@@ -720,7 +720,7 @@ namespace GameHeatmap
             }
         }
 
-        private void BuildVariations(MoveNode node, int depth, int maxDepth, int maxBranches, int percentThreshold, int startMove)
+        private void BuildVariations(MoveNode node, int depth, int maxDepth, int maxBranches, int percentThreshold, int startMove, bool respectStartMove = true)
         {
             // Stop at max depth
             if (depth >= maxDepth)
@@ -801,100 +801,104 @@ namespace GameHeatmap
                         };
 
                         node.NextMoves.Add(bestMoveNode);
-                        BuildVariations(bestMoveNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
+                        BuildVariations(bestMoveNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove, respectStartMove);
                         return;
                     }
                 }
                 else
                 {
-                    // Opponent's turn - find multiple variations (like normal opponent moves)
+                    // Opponent's turn - find opponent moves
                     int moveNum = (depth / 2) + 1;
-                    if (moveNum > startMove)  // Start branching AFTER this move number
+
+                    // Separate Theodore and Database moves
+                    var theodoreMoves = new Dictionary<string, int>();
+                    var databaseMoves = new Dictionary<string, int>();
+
+                    // Check Theodore's games
+                    if (chkUseTheodoreGames.Checked && theodoreTree != null)
                     {
-                        // Separate Theodore and Database moves
-                        var theodoreMoves = new Dictionary<string, int>();
-                        var databaseMoves = new Dictionary<string, int>();
-
-                        // Check Theodore's games
-                        if (chkUseTheodoreGames.Checked && theodoreTree != null)
+                        var moves = FindMovesInTree(theodoreTree.Root, moveSequence, isWhiteToMoveNow);
+                        foreach (var (san, freq) in moves)
                         {
-                            var moves = FindMovesInTree(theodoreTree.Root, moveSequence, isWhiteToMoveNow);
-                            foreach (var (san, freq) in moves)
+                            theodoreMoves[san] = freq;
+                        }
+                    }
+
+                    // Check database
+                    if (chkUseDatabaseGames.Checked && (databaseTree != null || databaseBlob != null))
+                    {
+                        var moves = databaseTree != null
+                            ? FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow)
+                            : FindMovesInBlob(databaseBlob!.RootOffset, moveSequence, isWhiteToMoveNow);
+                        foreach (var (san, freq) in moves)
+                        {
+                            databaseMoves[san] = freq;
+                        }
+                    }
+
+                    // Combine and sort
+                    var allMoves = new Dictionary<string, (int theoFreq, int dbFreq)>();
+
+                    foreach (var kvp in theodoreMoves)
+                    {
+                        allMoves[kvp.Key] = (kvp.Value, databaseMoves.GetValueOrDefault(kvp.Key, 0));
+                    }
+
+                    foreach (var kvp in databaseMoves)
+                    {
+                        if (!allMoves.ContainsKey(kvp.Key))
+                        {
+                            allMoves[kvp.Key] = (0, kvp.Value);
+                        }
+                    }
+
+                    if (allMoves.Count > 0)
+                    {
+                        // Sort by total frequency
+                        var sortedMoves = allMoves
+                            .Select(kvp => (san: kvp.Key, theoFreq: kvp.Value.theoFreq, dbFreq: kvp.Value.dbFreq, totalFreq: kvp.Value.theoFreq + kvp.Value.dbFreq))
+                            .OrderByDescending(m => m.totalFreq)
+                            .ToList();
+
+                        int totalGames = sortedMoves.Sum(m => m.totalFreq);
+                        int cumulativeGames = 0;
+
+                        // Determine how many moves to add based on startMove setting
+                        // If respectStartMove is false, always branch (ignore startMove)
+                        bool shouldBranch = !respectStartMove || (moveNum > startMove);  // Branch immediately if not respecting startMove, or after startMove
+                        int movesToAdd = shouldBranch ? maxBranches : 1;  // Add only mainline if before startMove
+
+                        foreach (var move in sortedMoves)
+                        {
+                            cumulativeGames += move.totalFreq;
+                            double percentage = (cumulativeGames * 100.0) / totalGames;
+
+                            // Build comment using helper method that respects annotation checkboxes
+                            var (comment, hasTheodore, hasDatabase) = BuildCombinedComment(
+                                move.theoFreq,
+                                move.dbFreq,
+                                moveSequence,
+                                move.san);
+
+                            var variationNode = new MoveNode
                             {
-                                theodoreMoves[san] = freq;
-                            }
+                                MoveNumber = moveNum,
+                                San = move.san,
+                                Comment = comment,
+                                HasTheodoreComment = hasTheodore,
+                                HasDatabaseComment = hasDatabase,
+                                Parent = node,
+                                isWhiteTurn = !isWhiteToMoveNow
+                            };
+
+                            node.NextMoves.Add(variationNode);
+                            BuildVariations(variationNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove, respectStartMove);
+
+                            // Stop after adding the appropriate number of moves
+                            if (!shouldBranch || node.NextMoves.Count >= movesToAdd || percentage >= percentThreshold)
+                                break;
                         }
-
-                        // Check database
-                        if (chkUseDatabaseGames.Checked && (databaseTree != null || databaseBlob != null))
-                        {
-                            var moves = databaseTree != null
-                                ? FindMovesInTree(databaseTree.Root, moveSequence, isWhiteToMoveNow)
-                                : FindMovesInBlob(databaseBlob!.RootOffset, moveSequence, isWhiteToMoveNow);
-                            foreach (var (san, freq) in moves)
-                            {
-                                databaseMoves[san] = freq;
-                            }
-                        }
-
-                        // Combine and sort
-                        var allMoves = new Dictionary<string, (int theoFreq, int dbFreq)>();
-
-                        foreach (var kvp in theodoreMoves)
-                        {
-                            allMoves[kvp.Key] = (kvp.Value, databaseMoves.GetValueOrDefault(kvp.Key, 0));
-                        }
-
-                        foreach (var kvp in databaseMoves)
-                        {
-                            if (!allMoves.ContainsKey(kvp.Key))
-                            {
-                                allMoves[kvp.Key] = (0, kvp.Value);
-                            }
-                        }
-
-                        if (allMoves.Count > 0)
-                        {
-                            // Sort by total frequency
-                            var sortedMoves = allMoves
-                                .Select(kvp => (san: kvp.Key, theoFreq: kvp.Value.theoFreq, dbFreq: kvp.Value.dbFreq, totalFreq: kvp.Value.theoFreq + kvp.Value.dbFreq))
-                                .OrderByDescending(m => m.totalFreq)
-                                .ToList();
-
-                            int totalGames = sortedMoves.Sum(m => m.totalFreq);
-                            int cumulativeGames = 0;
-
-                            foreach (var move in sortedMoves)
-                            {
-                                cumulativeGames += move.totalFreq;
-                                double percentage = (cumulativeGames * 100.0) / totalGames;
-
-                                // Build comment using helper method that respects annotation checkboxes
-                                var (comment, hasTheodore, hasDatabase) = BuildCombinedComment(
-                                    move.theoFreq,
-                                    move.dbFreq,
-                                    moveSequence,
-                                    move.san);
-
-                                var variationNode = new MoveNode
-                                {
-                                    MoveNumber = moveNum,
-                                    San = move.san,
-                                    Comment = comment,
-                                    HasTheodoreComment = hasTheodore,
-                                    HasDatabaseComment = hasDatabase,
-                                    Parent = node,
-                                    isWhiteTurn = !isWhiteToMoveNow
-                                };
-
-                                node.NextMoves.Add(variationNode);
-                                BuildVariations(variationNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
-
-                                if (node.NextMoves.Count >= maxBranches || percentage >= percentThreshold)
-                                    break;
-                            }
-                            return;
-                        }
+                        return;
                     }
                 }
                 
@@ -956,7 +960,7 @@ namespace GameHeatmap
                         // Continue building this variation recursively
                         if (depth + 1 < maxDepth)
                         {
-                            BuildVariations(variationNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
+                            BuildVariations(variationNode, depth + 1, maxDepth, maxBranches, percentThreshold, startMove, respectStartMove);
                         }
                     }
                     else if (existingMoves.Contains(san))
@@ -993,7 +997,7 @@ namespace GameHeatmap
             // This ensures that variations from the source PGN are also explored
             foreach (var child in node.NextMoves)
             {
-                BuildVariations(child, depth + 1, maxDepth, maxBranches, percentThreshold, startMove);
+                BuildVariations(child, depth + 1, maxDepth, maxBranches, percentThreshold, startMove, respectStartMove);
             }
         }
 
@@ -1948,12 +1952,33 @@ namespace GameHeatmap
 
         private void InsertMoveFromBoard(string san)
         {
-            // Get the currently selected node - this is where we'll insert the move
-            if (treeVariations.SelectedNode?.Tag is not MoveNode currentNode)
+            MoveNode currentNode;
+
+            // Get the currently selected node, or create a root if tree is empty
+            if (treeVariations.SelectedNode?.Tag is MoveNode selectedNode)
             {
-                MessageBox.Show("Please select a position in the tree to insert the move after.",
-                    "No Position Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
+                currentNode = selectedNode;
+            }
+            else
+            {
+                // No node selected or tree is empty - use or create root node
+                if (outputRoot == null)
+                {
+                    // Create a new root node for empty tree
+                    // The root represents the starting position before any moves
+                    // isWhiteTurn = true means "it's white's turn to move next"
+                    // The formula for next move number is: MoveNumber + (isWhiteTurn ? 1 : 0)
+                    // So with MoveNumber=0, isWhiteTurn=true: 0 + 1 = 1 (correct for white's first move)
+                    outputRoot = new MoveNode
+                    {
+                        MoveNumber = 0,
+                        San = "",
+                        Comment = "",
+                        Parent = null,
+                        isWhiteTurn = true // It's white's turn to move (next move will be move 1)
+                    };
+                }
+                currentNode = outputRoot;
             }
 
             // Check if this move already exists as a variation
@@ -1998,48 +2023,48 @@ namespace GameHeatmap
             // Find the TreeNode for the parent move
             TreeNode? parentTreeNode = FindTreeNode(treeVariations.Nodes, currentNode);
 
-            // Ask if user wants to generate variations from this point
-            var result = MessageBox.Show(
-                $"Move {san} inserted.\n\nGenerate variations from this new move?",
-                "Generate Variations",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
+            // Don't auto-generate variations - user can manually trigger with R key or context menu
 
-            if (result == DialogResult.Yes)
-            {
-                var moveSequence = new List<string>();
-                BuildMoveSequence(newNode, moveSequence);
+            // Add the new node to TreeView
+            bool moveByWhite = !newNode.isWhiteTurn;
+            string moveNum = moveByWhite ? $"{newNode.MoveNumber}." : $"{newNode.MoveNumber}...";
+            var newTreeNode = new TreeNode($"{moveNum}{newNode.San}");
+            newTreeNode.Tag = newNode;
+            newTreeNode.ForeColor = Color.Blue; // Board-inserted moves in blue
 
-                int maxBranches = (int)numMaxBranches.Value;
-                int percentThreshold = (int)numPercentThreshold.Value;
-                int maxDepth = (int)numMaxDepth.Value * 2;
-                int startMove = (int)numStartMove.Value;
-
-                int currentDepth = moveSequence.Count;
-                BuildVariations(newNode, currentDepth, maxDepth, maxBranches, percentThreshold, startMove);
-            }
-
-            // Add the new node (and any generated children) to TreeView
             if (parentTreeNode != null)
             {
-                bool moveByWhite = !newNode.isWhiteTurn;
-                string moveNum = moveByWhite ? $"{newNode.MoveNumber}." : $"{newNode.MoveNumber}...";
-                var newTreeNode = new TreeNode($"{moveNum}{newNode.San}");
-                newTreeNode.Tag = newNode;
-                newTreeNode.ForeColor = Color.Blue; // Board-inserted moves in blue
-
+                // Add to existing parent node
                 parentTreeNode.Nodes.Add(newTreeNode);
-
-                if (result == DialogResult.Yes)
-                {
-                    BuildTreeViewRecursive(newNode, newTreeNode);
-                }
 
                 parentTreeNode.Expand();
                 newTreeNode.EnsureVisible();
 
                 // Select the new node and update the board to show the new position
                 treeVariations.SelectedNode = newTreeNode;
+            }
+            else
+            {
+                // Tree was empty - create root and add first move
+                treeVariations.Nodes.Clear();
+                var rootTreeNode = new TreeNode("Opening Repertoire");
+                rootTreeNode.Tag = outputRoot;
+                treeVariations.Nodes.Add(rootTreeNode);
+
+                rootTreeNode.Nodes.Add(newTreeNode);
+
+                rootTreeNode.Expand();
+                newTreeNode.EnsureVisible();
+
+                // Select the new node and update the board to show the new position
+                treeVariations.SelectedNode = newTreeNode;
+
+                // Enable save/copy buttons now that we have content
+                btnSave.Enabled = true;
+                btnCopy.Enabled = true;
+
+                // Generate PGN
+                generatedPgn = GeneratePgn(outputRoot);
             }
         }
 
@@ -2536,59 +2561,48 @@ namespace GameHeatmap
             {
                 SaveSnapshot($"Keep mainline only from {node.San}");
 
-                // Find the TreeNode for this MoveNode
-                TreeNode? treeNode = FindTreeNode(treeVariations.Nodes, node);
+                // Step 1: Clean up the MoveNode tree (remove all variations)
+                KeepMainlineRecursive(node);
 
-                // Remove sibling variations from both MoveNode tree and TreeView
-                KeepMainlineRecursiveWithTreeView(node, treeNode);
+                // Step 2: Clear HasBeenWritten flags to allow proper rebuild
+                ClearHasBeenWrittenFlags(node);
+
+                // Step 3: Rebuild the TreeView from the cleaned MoveNode tree
+                TreeNode? treeNode = FindTreeNode(treeVariations.Nodes, node);
+                if (treeNode != null)
+                {
+                    // Clear the TreeView children and rebuild from MoveNode tree
+                    treeNode.Nodes.Clear();
+                    BuildTreeViewRecursive(node, treeNode);
+                }
+
+                // Refresh the TreeView to ensure display is updated
+                treeVariations.Refresh();
             }
         }
 
-        private void KeepMainlineRecursiveWithTreeView(MoveNode node, TreeNode? treeNode)
+        private void KeepMainlineRecursive(MoveNode node)
         {
-            // Keep only the first child if there are multiple
+            // Remove all children except the first (mainline)
             if (node.NextMoves.Count > 1)
             {
-                // Keep only the first move (mainline) in MoveNode tree
-                var mainline = node.NextMoves[0];
-                node.NextMoves.Clear();
-                node.NextMoves.Add(mainline);
-
-                // Remove sibling TreeNodes if we have the TreeNode
-                if (treeNode != null && treeNode.Nodes.Count > 1)
-                {
-                    // Find which TreeNode corresponds to the mainline
-                    TreeNode? mainlineTreeNode = null;
-                    foreach (TreeNode child in treeNode.Nodes)
-                    {
-                        if (child.Tag == mainline)
-                        {
-                            mainlineTreeNode = child;
-                            break;
-                        }
-                    }
-
-                    // Remove all other TreeNodes
-                    treeNode.Nodes.Clear();
-                    if (mainlineTreeNode != null)
-                    {
-                        treeNode.Nodes.Add(mainlineTreeNode);
-                    }
-                }
+                // Remove all siblings except the first
+                node.NextMoves.RemoveRange(1, node.NextMoves.Count - 1);
             }
 
-            // ALWAYS recursively process children (even if this node had only 1 child)
-            // This ensures we clean up variations deeper in the tree
+            // Recursively process the mainline child
             if (node.NextMoves.Count > 0)
             {
-                TreeNode? nextTreeNode = null;
-                if (treeNode != null && treeNode.Nodes.Count > 0)
-                {
-                    nextTreeNode = treeNode.Nodes[0];
-                }
+                KeepMainlineRecursive(node.NextMoves[0]);
+            }
+        }
 
-                // Process the mainline child
-                KeepMainlineRecursiveWithTreeView(node.NextMoves[0], nextTreeNode);
+        private void ClearHasBeenWrittenFlags(MoveNode node)
+        {
+            node.HasBeenWritten = false;
+            foreach (var child in node.NextMoves)
+            {
+                ClearHasBeenWrittenFlags(child);
             }
         }
 
@@ -2742,7 +2756,7 @@ namespace GameHeatmap
                         int startMove = (int)numStartMove.Value;
 
                         int currentDepth = moveSequence.Count;
-                        BuildVariations(newNode, currentDepth, maxDepth, maxBranches, percentThreshold, startMove);
+                        BuildVariations(newNode, currentDepth, maxDepth, maxBranches, percentThreshold, startMove, respectStartMove: false);
                     }
 
                     // Add the new node (and any generated children) to TreeView
@@ -2857,7 +2871,7 @@ namespace GameHeatmap
                 int startMove = (int)numStartMove.Value;
 
                 int currentDepth = moveSequence.Count;
-                BuildVariations(node, currentDepth, maxDepth, maxBranches, percentThreshold, startMove);
+                BuildVariations(node, currentDepth, maxDepth, maxBranches, percentThreshold, startMove, respectStartMove: false);
 
                 // Rebuild just this subtree in the TreeView
                 if (treeNode != null)

@@ -315,81 +315,96 @@ namespace GameHeatmap
                 List<Direction> directionList = new List<Direction>();
                 switch (piece)
                 {
-                    case "P": directionList.Add(Direction.up);
-
-                        if (get(startRow - 1, startCol + 1) != null)
+                    case "P":
+                        // Pawns can only move forward when not capturing
+                        if (!takes)
                         {
-                            directionList.Add(Direction.upperRight);
-                        }
+                            directionList.Add(Direction.up);
 
-                        if (get(startRow - 1, startCol - 1) != null)
-                        {
-                            directionList.Add(Direction.upperLeft);
-                        }
-
-                        if (startRow == 6)
-                        {
-                            if (String.IsNullOrEmpty(get(startRow-1, startCol))){
-                                //Can only jump 2 squares if nothing blocking it
-                                directionList.Add(Direction.upTwice);
+                            if (startRow == 6)
+                            {
+                                if (String.IsNullOrEmpty(get(startRow-1, startCol))){
+                                    //Can only jump 2 squares if nothing blocking it
+                                    directionList.Add(Direction.upTwice);
+                                }
                             }
                         }
-
-                        //en passant
-                        if (startRow == 3)
+                        else
                         {
-                            if (node != null && node.Parent != null)
+                            // Pawns can only move diagonally when capturing
+                            if (get(startRow - 1, startCol + 1) != null)
                             {
-                                if (node.Parent.twoSquareRow == startRow)
+                                directionList.Add(Direction.upperRight);
+                            }
+
+                            if (get(startRow - 1, startCol - 1) != null)
+                            {
+                                directionList.Add(Direction.upperLeft);
+                            }
+
+                            //en passant
+                            if (startRow == 3)
+                            {
+                                if (node != null && node.Parent != null)
                                 {
-                                    if (node.Parent.twoSquareCol == startCol - 1)
+                                    if (node.Parent.twoSquareRow == startRow)
                                     {
-                                        directionList.Add(Direction.upperLeft);
-                                    } else if (node.Parent.twoSquareCol == startCol +1)
-                                    {
-                                        directionList.Add(Direction.upperRight);
+                                        if (node.Parent.twoSquareCol == startCol - 1)
+                                        {
+                                            directionList.Add(Direction.upperLeft);
+                                        } else if (node.Parent.twoSquareCol == startCol +1)
+                                        {
+                                            directionList.Add(Direction.upperRight);
+                                        }
                                     }
                                 }
                             }
                         }
-                            
+
                         break;
-                    case "p": directionList.Add(Direction.down);
-
-                        if (get(startRow + 1, startCol + 1) != null)
+                    case "p":
+                        // Pawns can only move forward when not capturing
+                        if (!takes)
                         {
-                            directionList.Add(Direction.lowerRight);
-                        }
+                            directionList.Add(Direction.down);
 
-                        if (get(startRow + 1, startCol - 1) != null)
-                        {
-                            directionList.Add(Direction.lowerLeft);
-                        }
-
-                        if (startRow == 1)
-                        {
-                            if (String.IsNullOrEmpty(get(startRow + 1, startCol)))
+                            if (startRow == 1)
                             {
-                                //Can only jump 2 squares if nothing blocking it
-                                directionList.Add(Direction.downTwice);
+                                if (String.IsNullOrEmpty(get(startRow + 1, startCol)))
+                                {
+                                    //Can only jump 2 squares if nothing blocking it
+                                    directionList.Add(Direction.downTwice);
+                                }
                             }
                         }
-
-
-                        //en passant
-                        if (startRow == 4)
+                        else
                         {
-                            if (node != null && node.Parent != null)
+                            // Pawns can only move diagonally when capturing
+                            if (get(startRow + 1, startCol + 1) != null)
                             {
-                                if (node.Parent.twoSquareRow == startRow)
+                                directionList.Add(Direction.lowerRight);
+                            }
+
+                            if (get(startRow + 1, startCol - 1) != null)
+                            {
+                                directionList.Add(Direction.lowerLeft);
+                            }
+
+                            //en passant
+                            if (startRow == 4)
+                            {
+                                if (node != null && node.Parent != null)
                                 {
-                                    if (node.Parent.twoSquareCol == startCol - 1)
+                                    if (node.Parent.twoSquareRow == startRow)
                                     {
-                                        directionList.Add(Direction.lowerLeft);
-                                    }
-                                    else if (node.Parent.twoSquareCol == startCol + 1)
-                                    {
-                                        directionList.Add(Direction.lowerRight);
+                                        if (node.Parent.twoSquareCol == startCol - 1)
+                                        {
+                                            directionList.Add(Direction.lowerLeft);
+                                        }
+                                        else if (node.Parent.twoSquareCol == startCol + 1)
+                                        {
+                                            directionList.Add(Direction.lowerRight);
+                                        }
                                     }
                                 }
                             }

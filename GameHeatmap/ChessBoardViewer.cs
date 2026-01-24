@@ -536,14 +536,22 @@ namespace GameHeatmap
             }
 
             // Generate possible SAN notation for this move
-            if (isPawn && takes)
+            if (isPawn)
             {
-                // For pawn captures, include the source file (e.g., "axb4", "exd5")
-                moveList.Add(moveSource[0] + "x" + moveTarget);
+                if (takes)
+                {
+                    // For pawn captures, include the source file (e.g., "axb4", "exd5")
+                    moveList.Add(moveSource[0] + "x" + moveTarget);
+                }
+                else
+                {
+                    // For non-capturing pawn moves, just the target square (e.g., "e4", "d5")
+                    moveList.Add(moveTarget);
+                }
             }
             else
             {
-                // For non-pawn moves or non-capturing pawn moves
+                // For non-pawn moves (pieces)
                 moveList.Add(pieceSource + (takes ? "x" : "") + moveTarget);
                 moveList.Add(pieceSource + moveSource[0] + (takes ? "x" : "") + moveTarget);
                 moveList.Add(pieceSource + moveSource[1] + (takes ? "x" : "") + moveTarget);
@@ -552,17 +560,22 @@ namespace GameHeatmap
 
             if (isPawn)
             {
-                string[] promotePieceList = { "Q", "N", "B", "R" };
-                List<string> moveListWithPromote = new List<string>();
-
-                foreach (var moveItem in moveList)
+                // Only add promotion if pawn is moving to the 8th or 1st rank
+                bool isPromotion = (targetRow == 0 || targetRow == 7);
+                if (isPromotion)
                 {
-                    foreach (var promoPiece in promotePieceList)
+                    string[] promotePieceList = { "Q", "N", "B", "R" };
+                    List<string> moveListWithPromote = new List<string>();
+
+                    foreach (var moveItem in moveList)
                     {
-                        moveListWithPromote.Add(moveItem + "=" + promoPiece);
+                        foreach (var promoPiece in promotePieceList)
+                        {
+                            moveListWithPromote.Add(moveItem + "=" + promoPiece);
+                        }
                     }
+                    moveList.AddRange(moveListWithPromote);
                 }
-                moveList.AddRange(moveListWithPromote);
             }
 
             // Try to determine the correct SAN using the chess board
