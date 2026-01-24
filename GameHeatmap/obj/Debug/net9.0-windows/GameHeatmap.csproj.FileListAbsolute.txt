@@ -17,3 +17,4 @@ C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\ref\GameHeat
 C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.sourcelink.json
 C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.OpeningBuilderForm.resources
 C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.GameDetailsForm.resources
+C:\data\chess\apps\GameHeatmap\GameHeatmap\obj\Debug\net9.0-windows\GameHeatmap.ChessBoardViewer.resources

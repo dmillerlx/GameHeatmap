@@ -21,6 +21,7 @@ namespace GameHeatmap
         private Button btnSave;
         private Button btnCopy;
         private Button btnClear;
+        private Button btnShowBoard;
         
         // Configuration controls
         private NumericUpDown numMaxBranches;
@@ -50,6 +51,7 @@ namespace GameHeatmap
         private string generatedPgn = "";
         private string lastPgnPath = "";
         private MoveNode? outputRoot = null;  // Store the generated tree
+        private ChessBoardViewer? boardViewer = null;
         private bool isLoadingSettings = false;  // Flag to prevent saving during load
         private float dpiScale = 1.0f;
         private string playerName = "Theodore";
@@ -247,6 +249,7 @@ namespace GameHeatmap
             };
             treeVariations.NodeMouseDoubleClick += TreeVariations_NodeMouseDoubleClick;
             treeVariations.KeyDown += TreeVariations_KeyDown;
+            treeVariations.AfterSelect += TreeVariations_AfterSelect;
 
             // Create context menu
             var contextMenu = new ContextMenuStrip();
@@ -433,7 +436,16 @@ namespace GameHeatmap
             };
             btnClear.Click += BtnClear_Click;
             topPanel.Controls.Add(btnClear);
-            
+
+            btnShowBoard = new Button
+            {
+                Text = "Show Board",
+                Location = new Point(Scale(530), Scale(100)),
+                Size = new Size(Scale(100), Scale(35))
+            };
+            btnShowBoard.Click += BtnShowBoard_Click;
+            topPanel.Controls.Add(btnShowBoard);
+
             this.Controls.Add(splitContainer);
             this.Controls.Add(topPanel);
         }
@@ -1904,6 +1916,219 @@ namespace GameHeatmap
             btnCopy.Enabled = false;
         }
 
+        private void BtnShowBoard_Click(object? sender, EventArgs e)
+        {
+            if (boardViewer == null || boardViewer.IsDisposed)
+            {
+                // Create initial board from starting position
+                var initialBoard = CreateInitialBoard();
+                boardViewer = new ChessBoardViewer(initialBoard, true, true);
+
+                // Set up callback for when user makes a move
+                boardViewer.OnMoveCompleted = (san) =>
+                {
+                    InsertMoveFromBoard(san);
+                };
+
+                boardViewer.Show();
+                boardViewer.FormClosed += (s, args) => boardViewer = null;
+
+                // Update board to current selection if a node is selected
+                if (treeVariations.SelectedNode?.Tag is MoveNode selectedNode)
+                {
+                    UpdateBoardPosition(selectedNode);
+                }
+            }
+            else
+            {
+                boardViewer.BringToFront();
+                boardViewer.Focus();
+            }
+        }
+
+        private void InsertMoveFromBoard(string san)
+        {
+            // Get the currently selected node - this is where we'll insert the move
+            if (treeVariations.SelectedNode?.Tag is not MoveNode currentNode)
+            {
+                MessageBox.Show("Please select a position in the tree to insert the move after.",
+                    "No Position Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Check if this move already exists as a variation
+            bool moveExists = currentNode.NextMoves.Any(m => m.San == san);
+            if (moveExists)
+            {
+                MessageBox.Show($"The move {san} already exists as a variation at this position.",
+                    "Move Already Exists", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Find and select the existing move in the tree
+                TreeNode? existingParentNode = FindTreeNode(treeVariations.Nodes, currentNode);
+                if (existingParentNode != null)
+                {
+                    foreach (TreeNode childTreeNode in existingParentNode.Nodes)
+                    {
+                        if (childTreeNode.Tag is MoveNode childMove && childMove.San == san)
+                        {
+                            treeVariations.SelectedNode = childTreeNode;
+                            childTreeNode.EnsureVisible();
+                            break;
+                        }
+                    }
+                }
+                return;
+            }
+
+            SaveSnapshot($"Insert move {san} from board after {currentNode.San}");
+
+            // Create new move node
+            var newNode = new MoveNode
+            {
+                MoveNumber = currentNode.MoveNumber + (currentNode.isWhiteTurn ? 1 : 0),
+                San = san,
+                Comment = "",
+                Parent = currentNode,
+                isWhiteTurn = !currentNode.isWhiteTurn
+            };
+
+            // Add as a variation to MoveNode tree
+            currentNode.NextMoves.Add(newNode);
+
+            // Find the TreeNode for the parent move
+            TreeNode? parentTreeNode = FindTreeNode(treeVariations.Nodes, currentNode);
+
+            // Ask if user wants to generate variations from this point
+            var result = MessageBox.Show(
+                $"Move {san} inserted.\n\nGenerate variations from this new move?",
+                "Generate Variations",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                var moveSequence = new List<string>();
+                BuildMoveSequence(newNode, moveSequence);
+
+                int maxBranches = (int)numMaxBranches.Value;
+                int percentThreshold = (int)numPercentThreshold.Value;
+                int maxDepth = (int)numMaxDepth.Value * 2;
+                int startMove = (int)numStartMove.Value;
+
+                int currentDepth = moveSequence.Count;
+                BuildVariations(newNode, currentDepth, maxDepth, maxBranches, percentThreshold, startMove);
+            }
+
+            // Add the new node (and any generated children) to TreeView
+            if (parentTreeNode != null)
+            {
+                bool moveByWhite = !newNode.isWhiteTurn;
+                string moveNum = moveByWhite ? $"{newNode.MoveNumber}." : $"{newNode.MoveNumber}...";
+                var newTreeNode = new TreeNode($"{moveNum}{newNode.San}");
+                newTreeNode.Tag = newNode;
+                newTreeNode.ForeColor = Color.Blue; // Board-inserted moves in blue
+
+                parentTreeNode.Nodes.Add(newTreeNode);
+
+                if (result == DialogResult.Yes)
+                {
+                    BuildTreeViewRecursive(newNode, newTreeNode);
+                }
+
+                parentTreeNode.Expand();
+                newTreeNode.EnsureVisible();
+
+                // Select the new node and update the board to show the new position
+                treeVariations.SelectedNode = newTreeNode;
+            }
+        }
+
+        private string[,] CreateInitialBoard()
+        {
+            string[,] board = new string[8, 8];
+
+            // Set up starting position
+            board[0, 0] = "r"; board[0, 1] = "n"; board[0, 2] = "b"; board[0, 3] = "q";
+            board[0, 4] = "k"; board[0, 5] = "b"; board[0, 6] = "n"; board[0, 7] = "r";
+            for (int i = 0; i < 8; i++) board[1, i] = "p";
+
+            for (int row = 2; row < 6; row++)
+                for (int col = 0; col < 8; col++)
+                    board[row, col] = "";
+
+            for (int i = 0; i < 8; i++) board[6, i] = "P";
+            board[7, 0] = "R"; board[7, 1] = "N"; board[7, 2] = "B"; board[7, 3] = "Q";
+            board[7, 4] = "K"; board[7, 5] = "B"; board[7, 6] = "N"; board[7, 7] = "R";
+
+            return board;
+        }
+
+        private void UpdateBoardPosition(MoveNode node)
+        {
+            if (boardViewer != null && !boardViewer.IsDisposed)
+            {
+                // If this is the root node (no SAN), show starting position
+                if (string.IsNullOrEmpty(node.San))
+                {
+                    var initialBoard = CreateInitialBoard();
+                    boardViewer.UpdatePosition(initialBoard, true);
+                    return;
+                }
+
+                if (node.boardCache != null)
+                {
+                    // Use cached position - node.isWhiteTurn tells us whose turn it is AFTER this move
+                    // So we need to flip it to get the color that just moved
+                    boardViewer.UpdatePosition(node.boardCache, node.isWhiteTurn);
+                }
+                else
+                {
+                    // Rebuild position from root by walking back to find all moves
+                    var path = new List<MoveNode>();
+                    var current = node;
+                    while (current != null && !string.IsNullOrEmpty(current.San))
+                    {
+                        path.Insert(0, current);
+                        current = current.Parent;
+                    }
+
+                    // Start with initial position
+                    var chessBoard = new ChessBoard("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+
+                    // Apply each move in sequence
+                    foreach (var moveNode in path)
+                    {
+                        try
+                        {
+                            chessBoard.ApplyMove(moveNode.San, moveNode);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Error applying move {moveNode.San}: {ex.Message}",
+                                "Board Update Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+
+                    boardViewer.UpdatePosition(chessBoard.GetBoard(), chessBoard.isWhiteTurn);
+                }
+            }
+        }
+
+        private void TreeVariations_AfterSelect(object? sender, TreeViewEventArgs e)
+        {
+            if (e.Node?.Tag is MoveNode selectedNode)
+            {
+                UpdateBoardPosition(selectedNode);
+            }
+            else if (e.Node != null && boardViewer != null && !boardViewer.IsDisposed)
+            {
+                // No MoveNode tag - might be selecting a non-move node, show starting position
+                var initialBoard = CreateInitialBoard();
+                boardViewer.UpdatePosition(initialBoard, true);
+            }
+        }
+
         private MoveFrequencyTree MaterializeTreeFromBlob(BinaryTreeNavigator navigator)
         {
             var tree = new MoveFrequencyTree();
@@ -2497,11 +2722,12 @@ namespace GameHeatmap
                     TreeNode? parentTreeNode = FindTreeNode(treeVariations.Nodes, node);
 
                     // Ask if user wants to generate variations from this point
-                    var result = MessageBox.Show(
-                        "Generate variations from this new move?",
-                        "Generate Variations",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question);
+                    var result = DialogResult.Yes;
+                    //var result = MessageBox.Show(
+                    //    "Generate variations from this new move?",
+                    //    "Generate Variations",
+                    //    MessageBoxButtons.YesNo,
+                    //    MessageBoxIcon.Question);
 
                     if (result == DialogResult.Yes)
                     {

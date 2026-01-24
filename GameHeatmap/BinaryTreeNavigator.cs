@@ -412,8 +412,8 @@ namespace GameHeatmap
 
         public void BuildFromTree(MoveFrequencyTree tree, string outputPath, IProgress<(int nodesWritten, int totalNodes)>? progress = null, int maxChunkSizeMB = 1024)
         {
-            Console.WriteLine($"[BLOB SAVE] Starting blob save to {outputPath}");
-            Console.WriteLine($"[BLOB SAVE] Chunk size: {maxChunkSizeMB}MB ({maxChunkSizeMB * 1024L * 1024L:N0} bytes)");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Starting blob save to {outputPath}");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Chunk size: {maxChunkSizeMB}MB ({maxChunkSizeMB * 1024L * 1024L:N0} bytes)");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Starting blob save to {outputPath}");
             var totalSw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -429,7 +429,7 @@ namespace GameHeatmap
             int totalNodes = CountNodesParallel(tree.Root);
 
             phase1Sw.Stop();
-            Console.WriteLine($"[BLOB SAVE] Phase 1 (Count): {totalNodes:N0} nodes in {phase1Sw.ElapsedMilliseconds}ms ({phase1Sw.ElapsedMilliseconds/1000.0:F1}s)");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 1 (Count): {totalNodes:N0} nodes in {phase1Sw.ElapsedMilliseconds}ms ({phase1Sw.ElapsedMilliseconds/1000.0:F1}s)");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 1 (Count): {totalNodes:N0} nodes in {phase1Sw.ElapsedMilliseconds}ms ({phase1Sw.ElapsedMilliseconds/1000.0:F1}s)");
 
             // Now we know total - report 0 progress
@@ -441,7 +441,7 @@ namespace GameHeatmap
             CollectStringsParallel(tree.Root);
 
             phase2Sw.Stop();
-            Console.WriteLine($"[BLOB SAVE] Phase 2 (Strings): {strings.Count:N0} unique strings in {phase2Sw.ElapsedMilliseconds}ms ({phase2Sw.ElapsedMilliseconds/1000.0:F1}s)");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 2 (Strings): {strings.Count:N0} unique strings in {phase2Sw.ElapsedMilliseconds}ms ({phase2Sw.ElapsedMilliseconds/1000.0:F1}s)");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 2 (Strings): {strings.Count:N0} unique strings in {phase2Sw.ElapsedMilliseconds}ms ({phase2Sw.ElapsedMilliseconds/1000.0:F1}s)");
 
             // PHASE 3: Calculate offsets (still sequential for now)
@@ -457,12 +457,12 @@ namespace GameHeatmap
             CalculateOffsets(tree.Root, ref currentOffset);
 
             phase3Sw.Stop();
-            Console.WriteLine($"[BLOB SAVE] Phase 3 (Offsets): Calculated in {phase3Sw.ElapsedMilliseconds}ms ({phase3Sw.ElapsedMilliseconds/1000.0:F1}s)");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 3 (Offsets): Calculated in {phase3Sw.ElapsedMilliseconds}ms ({phase3Sw.ElapsedMilliseconds/1000.0:F1}s)");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 3 (Offsets): Calculated in {phase3Sw.ElapsedMilliseconds}ms ({phase3Sw.ElapsedMilliseconds/1000.0:F1}s)");
 
             // PHASE 4: Write to disk
             long estimatedSize = currentOffset;
-            Console.WriteLine($"[BLOB SAVE] Estimated size: {estimatedSize:N0} bytes ({estimatedSize / (1024.0 * 1024.0):F2} MB)");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Estimated size: {estimatedSize:N0} bytes ({estimatedSize / (1024.0 * 1024.0):F2} MB)");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Estimated size: {estimatedSize:N0} bytes ({estimatedSize / (1024.0 * 1024.0):F2} MB)");
 
             var phase4Sw = System.Diagnostics.Stopwatch.StartNew();
@@ -498,17 +498,17 @@ namespace GameHeatmap
             }
 
             phase4Sw.Stop();
-            Console.WriteLine($"[BLOB SAVE] Phase 4 (Write): {totalNodes:N0} nodes written in {phase4Sw.ElapsedMilliseconds}ms ({phase4Sw.ElapsedMilliseconds/1000.0:F1}s)");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 4 (Write): {totalNodes:N0} nodes written in {phase4Sw.ElapsedMilliseconds}ms ({phase4Sw.ElapsedMilliseconds/1000.0:F1}s)");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 4 (Write): {totalNodes:N0} nodes written in {phase4Sw.ElapsedMilliseconds}ms ({phase4Sw.ElapsedMilliseconds/1000.0:F1}s)");
 
             // Clear the offset dictionary to free memory
             nodeOffsets.Clear();
 
             totalSw.Stop();
-            Console.WriteLine($"[BLOB SAVE] ===== COMPLETE =====");
-            Console.WriteLine($"[BLOB SAVE] Total time: {totalSw.ElapsedMilliseconds}ms ({totalSw.ElapsedMilliseconds/1000.0:F1}s)");
-            Console.WriteLine($"[BLOB SAVE] Phase 1: {phase1Sw.ElapsedMilliseconds}ms | Phase 2: {phase2Sw.ElapsedMilliseconds}ms | Phase 3: {phase3Sw.ElapsedMilliseconds}ms | Phase 4: {phase4Sw.ElapsedMilliseconds}ms");
-            Console.WriteLine($"[BLOB SAVE] Total nodes: {totalNodes:N0} | Chunks: {chunkStreams.Count}");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] ===== COMPLETE =====");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Total time: {totalSw.ElapsedMilliseconds}ms ({totalSw.ElapsedMilliseconds/1000.0:F1}s)");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 1: {phase1Sw.ElapsedMilliseconds}ms | Phase 2: {phase2Sw.ElapsedMilliseconds}ms | Phase 3: {phase3Sw.ElapsedMilliseconds}ms | Phase 4: {phase4Sw.ElapsedMilliseconds}ms");
+            System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Total nodes: {totalNodes:N0} | Chunks: {chunkStreams.Count}");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] ===== COMPLETE =====");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Total time: {totalSw.ElapsedMilliseconds}ms ({totalSw.ElapsedMilliseconds/1000.0:F1}s)");
             System.Diagnostics.Debug.WriteLine($"[BLOB SAVE] Phase 1: {phase1Sw.ElapsedMilliseconds}ms | Phase 2: {phase2Sw.ElapsedMilliseconds}ms | Phase 3: {phase3Sw.ElapsedMilliseconds}ms | Phase 4: {phase4Sw.ElapsedMilliseconds}ms");

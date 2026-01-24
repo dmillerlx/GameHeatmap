@@ -1081,9 +1081,9 @@ namespace GameHeatmap
         public void SaveToFile(string filePath, int maxChunkSizeMB = 1024)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            Console.WriteLine($"[SAVE] Starting save to {filePath}");
-            Console.WriteLine($"[SAVE] Max depth: {maxDepth}, Total games: {totalGamesProcessed}");
-            Console.WriteLine($"[SAVE] Chunk size parameter: {maxChunkSizeMB}MB (note: simple binary format doesn't use chunking)");
+            System.Diagnostics.Debug.WriteLine($"[SAVE] Starting save to {filePath}");
+            System.Diagnostics.Debug.WriteLine($"[SAVE] Max depth: {maxDepth}, Total games: {totalGamesProcessed}");
+            System.Diagnostics.Debug.WriteLine($"[SAVE] Chunk size parameter: {maxChunkSizeMB}MB (note: simple binary format doesn't use chunking)");
 
             using (var writer = new BinaryWriter(File.Open(filePath, FileMode.Create)))
             {
@@ -1096,7 +1096,7 @@ namespace GameHeatmap
             }
 
             sw.Stop();
-            Console.WriteLine($"[SAVE] Complete in {sw.ElapsedMilliseconds}ms ({sw.ElapsedMilliseconds/1000.0:F1}s)");
+            System.Diagnostics.Debug.WriteLine($"[SAVE] Complete in {sw.ElapsedMilliseconds}ms ({sw.ElapsedMilliseconds/1000.0:F1}s)");
         }
 
         private void WriteNode(BinaryWriter writer, FrequencyNode node)
