@@ -2310,6 +2310,12 @@ namespace GameHeatmap
                     e.Handled = true;
                     break;
 
+                case Keys.X:
+                    if (selectedMoveNode != null)
+                        ExpandCondensedLine(selectedMoveNode);
+                    e.Handled = true;
+                    break;
+
                 case Keys.Z:
                     if (e.Control)
                     {
@@ -2400,6 +2406,15 @@ namespace GameHeatmap
                     if (selectedMoveNode != null)
                     {
                         KeepMainlineOnly(selectedMoveNode);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                    }
+                    break;
+
+                case Keys.X:
+                    if (selectedMoveNode != null)
+                    {
+                        ExpandCondensedLine(selectedMoveNode);
                         e.Handled = true;
                         e.SuppressKeyPress = true;
                     }
@@ -2603,6 +2618,229 @@ namespace GameHeatmap
             foreach (var child in node.NextMoves)
             {
                 ClearHasBeenWrittenFlags(child);
+            }
+        }
+
+        private void ExpandCondensedLine(MoveNode node)
+        {
+            // Find the selected TreeNode
+            TreeNode? selectedTreeNode = FindTreeNode(treeVariations.Nodes, node);
+            if (selectedTreeNode == null)
+                return;
+
+            // Get the parent TreeNode first
+            TreeNode? parentTreeNode = selectedTreeNode.Parent;
+            if (parentTreeNode == null)
+                return;
+
+            // The TreeNode's Tag is the LAST move in a condensed sequence
+            // But if the TreeNode's parent Tag matches node's parent MoveNode,
+            // then this is already an expanded single-move node
+            if (parentTreeNode != null && parentTreeNode.Tag == node.Parent)
+            {
+                MessageBox.Show("This is already an expanded single move.", "Already Expanded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Find the FIRST move by walking back, but stop if we encounter
+            // a move that's already represented as a sibling TreeNode
+            MoveNode firstMove = node;
+            while (firstMove.Parent != null &&
+                   !string.IsNullOrEmpty(firstMove.Parent.San) &&
+                   firstMove.Parent.NextMoves.Count == 1)
+            {
+                // Check if the parent move already has its own TreeNode as a sibling
+                bool parentAlreadyExists = false;
+                foreach (TreeNode sibling in parentTreeNode.Nodes)
+                {
+                    if (sibling != selectedTreeNode && sibling.Tag == firstMove.Parent)
+                    {
+                        parentAlreadyExists = true;
+                        break;
+                    }
+                }
+
+                if (parentAlreadyExists)
+                    break;
+
+                firstMove = firstMove.Parent;
+            }
+
+            // Check if this is actually a condensed line (firstMove != node)
+            if (firstMove == node)
+            {
+                // This is a single move, not a condensed line
+                // Check if it has children - if so, it's already been expanded into individual nodes
+                if (selectedTreeNode.Nodes.Count > 0)
+                {
+                    MessageBox.Show("This line is already expanded.", "Already Expanded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                MessageBox.Show("This is a single move, not a condensed line.", "Not Condensed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Check if the first move already exists as a sibling TreeNode
+            // If so, the line is already expanded
+            foreach (TreeNode sibling in parentTreeNode.Nodes)
+            {
+                if (sibling != selectedTreeNode && sibling.Tag == firstMove)
+                {
+                    MessageBox.Show("This line is already expanded (first move exists as a separate node).", "Already Expanded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+            }
+
+            SaveSnapshot($"Expand condensed line");
+
+            // Get the index of the selected TreeNode in its parent
+            int index = parentTreeNode.Nodes.IndexOf(selectedTreeNode);
+
+            // Save any children that the condensed TreeNode had (variations)
+            var savedChildren = new List<TreeNode>();
+            foreach (TreeNode child in selectedTreeNode.Nodes)
+            {
+                savedChildren.Add(child);
+            }
+            selectedTreeNode.Nodes.Clear();
+
+            // Remove the condensed TreeNode
+            parentTreeNode.Nodes.Remove(selectedTreeNode);
+
+            // Create individual TreeNodes for each move in the sequence
+            MoveNode? current = firstMove;
+            TreeNode? lastCreatedTreeNode = null;
+            TreeNode? insertLocation = parentTreeNode;
+            int insertIndex = index;
+            bool isFirstMove = true;
+
+            while (current != null)
+            {
+                // Check if this move already exists as a sibling (for the first move only)
+                TreeNode? existingNode = null;
+                if (isFirstMove && insertLocation == parentTreeNode)
+                {
+                    foreach (TreeNode sibling in parentTreeNode.Nodes)
+                    {
+                        if (sibling.Tag == current)
+                        {
+                            existingNode = sibling;
+                            break;
+                        }
+                    }
+                }
+
+                TreeNode newTreeNode;
+                if (existingNode != null)
+                {
+                    // Use the existing node instead of creating a new one
+                    newTreeNode = existingNode;
+                }
+                else
+                {
+                    bool moveByWhite = !current.isWhiteTurn;
+                    string moveNum = moveByWhite ? $"{current.MoveNumber}." : $"{current.MoveNumber}...";
+
+                    newTreeNode = new TreeNode($"{moveNum}{current.San}");
+                    newTreeNode.Tag = current;
+
+                    // Set color based on comment flags
+                    if (!string.IsNullOrEmpty(current.Comment))
+                    {
+                        if (current.HasTheodoreComment && current.HasDatabaseComment)
+                            newTreeNode.ForeColor = Color.Purple;
+                        else if (current.HasTheodoreComment)
+                            newTreeNode.ForeColor = Color.DarkRed;
+                        else if (current.HasDatabaseComment)
+                            newTreeNode.ForeColor = Color.DarkGreen;
+                    }
+                    else
+                    {
+                        newTreeNode.ForeColor = Color.Black;
+                        newTreeNode.NodeFont = new Font(treeVariations.Font, FontStyle.Bold);
+                    }
+
+                    // Insert at the appropriate location
+                    insertLocation.Nodes.Insert(insertIndex, newTreeNode);
+                }
+
+                isFirstMove = false;
+
+                lastCreatedTreeNode = newTreeNode;
+
+                // Move to next level for the next move
+                insertLocation = newTreeNode;
+                insertIndex = 0;
+
+                // Continue if this move has exactly 1 child (part of the sequence)
+                if (current.NextMoves.Count == 1)
+                    current = current.NextMoves[0];
+                else
+                {
+                    // End of sequence - restore any children that were saved from the original TreeNode
+                    foreach (var savedChild in savedChildren)
+                    {
+                        newTreeNode.Nodes.Add(savedChild);
+                    }
+                    break;
+                }
+            }
+
+            // Expand the parent to show the new nodes
+            parentTreeNode.Expand();
+
+            // Select the last created node
+            if (lastCreatedTreeNode != null)
+            {
+                treeVariations.SelectedNode = lastCreatedTreeNode;
+                lastCreatedTreeNode.EnsureVisible();
+            }
+
+            // Refresh the TreeView
+            treeVariations.Refresh();
+        }
+
+        private void BuildTreeViewRecursiveExpanded(MoveNode parentMoveNode, TreeNode parentTreeNode)
+        {
+            // Build each child as a separate TreeNode (no condensing)
+            foreach (var childMove in parentMoveNode.NextMoves)
+            {
+                bool moveByWhite = !childMove.isWhiteTurn;
+                string moveNum = moveByWhite ? $"{childMove.MoveNumber}." : $"{childMove.MoveNumber}...";
+
+                var childTreeNode = new TreeNode($"{moveNum}{childMove.San}");
+                childTreeNode.Tag = childMove;
+
+                // Set color based on comment flags
+                if (!string.IsNullOrEmpty(childMove.Comment))
+                {
+                    if (childMove.HasTheodoreComment && childMove.HasDatabaseComment)
+                        childTreeNode.ForeColor = Color.Purple;
+                    else if (childMove.HasTheodoreComment)
+                        childTreeNode.ForeColor = Color.DarkRed;
+                    else if (childMove.HasDatabaseComment)
+                        childTreeNode.ForeColor = Color.DarkGreen;
+                    else if (childMove.IsMainlineMove)
+                    {
+                        childTreeNode.ForeColor = Color.Black;
+                        childTreeNode.NodeFont = new Font(treeVariations.Font, FontStyle.Bold);
+                    }
+                }
+                else
+                {
+                    // Default: mainline style
+                    childTreeNode.ForeColor = Color.Black;
+                    childTreeNode.NodeFont = new Font(treeVariations.Font, FontStyle.Bold);
+                }
+
+                parentTreeNode.Nodes.Add(childTreeNode);
+
+                // Recursively build children
+                if (childMove.NextMoves.Count > 0)
+                {
+                    BuildTreeViewRecursiveExpanded(childMove, childTreeNode);
+                }
             }
         }
 
