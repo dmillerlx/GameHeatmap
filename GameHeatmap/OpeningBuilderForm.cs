@@ -168,9 +168,19 @@ namespace GameHeatmap
 
             this.Text = "Opening Builder";
             this.Size = new Size(Scale(1400), Scale(800));
-            this.StartPosition = FormStartPosition.CenterScreen;
+            this.StartPosition = FormStartPosition.Manual;
             this.KeyPreview = true;  // Enable keyboard shortcuts
             this.KeyDown += OpeningBuilderForm_KeyDown;
+
+            // Center the form manually, adjusting for the taller height
+            this.Load += (s, e) =>
+            {
+                var screen = Screen.FromControl(this);
+                this.Location = new Point(
+                    (screen.WorkingArea.Width - this.Width) / 2,
+                    (screen.WorkingArea.Height - this.Height) / 2
+                );
+            };
 
             // Split container for left/right panes
             SplitContainer splitContainer = new SplitContainer
@@ -1918,6 +1928,18 @@ namespace GameHeatmap
             generatedPgn = "";
             btnSave.Enabled = false;
             btnCopy.Enabled = false;
+            outputRoot = null;
+
+            // Reset undo/redo stacks
+            undoStack.Clear();
+            redoStack.Clear();
+
+            // Reset the board to starting position if it's open
+            if (boardViewer != null && !boardViewer.IsDisposed)
+            {
+                var initialBoard = CreateInitialBoard();
+                boardViewer.UpdatePosition(initialBoard, true); // true = white to move
+            }
         }
 
         private void BtnShowBoard_Click(object? sender, EventArgs e)
@@ -1933,6 +1955,13 @@ namespace GameHeatmap
                 {
                     InsertMoveFromBoard(san);
                 };
+
+                // Position the board form to the right of this form
+                boardViewer.StartPosition = FormStartPosition.Manual;
+                boardViewer.Location = new Point(
+                    this.Location.X + this.Width,
+                    this.Location.Y
+                );
 
                 boardViewer.Show();
                 boardViewer.FormClosed += (s, args) => boardViewer = null;
@@ -2566,30 +2595,49 @@ namespace GameHeatmap
 
         private void KeepMainlineOnly(MoveNode node)
         {
+            // For condensed lines, the TreeNode.Tag points to the LAST move in the sequence.
+            // We need to find the FIRST move in the condensed sequence to operate on.
+            // Walk back through single-child ancestors until we find a move with siblings or reach root.
+
+            MoveNode operatingNode = node;
+
+            // Walk back while parent exists, is not root, and has only one child
+            // This means we're in a condensed single-line sequence
+            while (operatingNode.Parent != null &&
+                   !string.IsNullOrEmpty(operatingNode.Parent.San) &&
+                   operatingNode.Parent.NextMoves.Count == 1)
+            {
+                operatingNode = operatingNode.Parent;
+            }
+
+            // Now operatingNode is either:
+            // 1. The first move in a condensed line (its parent has multiple children or is root)
+            // 2. The same as node (if node is not in a condensed line)
+
             var result = MessageBox.Show(
-                $"Keep only the mainline (top variation) from '{node.San}' onwards?\nThis will remove all alternative variations below this move.",
+                $"Keep only the mainline (top variation) from '{operatingNode.San}' onwards?\nThis will remove all alternative variations below this move.",
                 "Confirm Keep Mainline Only",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
             {
-                SaveSnapshot($"Keep mainline only from {node.San}");
+                SaveSnapshot($"Keep mainline only from {operatingNode.San}");
 
                 // Step 1: Clean up the MoveNode tree (remove all variations)
-                KeepMainlineRecursive(node);
+                KeepMainlineRecursive(operatingNode);
 
-                // Step 2: Clear HasBeenWritten flags to allow proper rebuild
-                ClearHasBeenWrittenFlags(node);
+                // Step 2: Clear HasBeenWritten flags from the root to allow proper rebuild
+                if (outputRoot != null)
+                    ClearHasBeenWrittenFlags(outputRoot);
 
-                // Step 3: Rebuild the TreeView from the cleaned MoveNode tree
-                TreeNode? treeNode = FindTreeNode(treeVariations.Nodes, node);
-                if (treeNode != null)
-                {
-                    // Clear the TreeView children and rebuild from MoveNode tree
-                    treeNode.Nodes.Clear();
-                    BuildTreeViewRecursive(node, treeNode);
-                }
+                // Step 3: Rebuild the entire tree to ensure proper condensing
+                treeVariations.Nodes.Clear();
+                var rootTreeNode = new TreeNode("Opening Repertoire");
+                rootTreeNode.Tag = outputRoot;
+                BuildTreeViewRecursive(outputRoot, rootTreeNode);
+                treeVariations.Nodes.Add(rootTreeNode);
+                rootTreeNode.Expand();
 
                 // Refresh the TreeView to ensure display is updated
                 treeVariations.Refresh();
